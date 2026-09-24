@@ -1,0 +1,36 @@
+<%- include('partials/header') %>
+<%- include('partials/navbar') %>
+
+<main class="container page-content">
+  <div class="page-header">
+    <h1>أذكار المساء 🌇</h1>
+    <p>وقتها من بعد صلاة العصر وحتى غروب الشمس أو منتصف الليل</p>
+  </div>
+
+  <div class="azkar-list">
+    <% azkar.forEach(function(item) { %>
+      <article class="zekr-card" id="zekr-<%= item.id %>">
+        <div class="zekr-body">
+          <% if (item.name) { %>
+            <div class="zekr-header-meta">
+              <h3 class="zekr-title"><%= item.name %></h3>
+              <% if (item.category) { %><span class="zekr-badge"><%= item.category %></span><% } %>
+            </div>
+          <% } %>
+          <p class="zekr-text"><%= item.text %></p>
+          <% if (item.virtue) { %>
+            <div class="zekr-virtue"><%= item.virtue %></div>
+          <% } %>
+        </div>
+        <div class="zekr-footer">
+          <span class="zekr-target">التكرار: <strong><%= item.count %></strong></span>
+          <button class="zekr-counter-btn" data-target="<%= item.count %>" data-current="0">
+            <span class="count-num">0</span> / <%= item.count %>
+          </button>
+        </div>
+      </article>
+    <% }); %>
+  </div>
+</main>
+
+<%- include('partials/footer') %>

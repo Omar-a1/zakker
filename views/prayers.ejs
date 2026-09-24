@@ -1,0 +1,69 @@
+<%- include('partials/header') %>
+<%- include('partials/navbar') %>
+
+<main class="container page-content">
+  <div class="page-header">
+    <h1>مواقيت الصلاة 🕌</h1>
+    <p id="locationDisplay">جارِ تحديد موقعك وجلب المواقيت عبر Aladhan API...</p>
+  </div>
+
+  <!-- City selector / changer -->
+  <div class="prayer-controls">
+    <div class="city-selector">
+      <label for="cityInput">المدينة:</label>
+      <input type="text" id="cityInput" placeholder="مثال: Cairo أو Alexandria" value="Cairo">
+      <label for="countryInput">الدولة:</label>
+      <input type="text" id="countryInput" placeholder="مثال: Egypt" value="Egypt">
+      <button id="fetchPrayersBtn" class="btn-primary">تحديث المواقيت</button>
+      <button id="geoLocateBtn" class="btn-secondary">استخدام موقعي الجغرافي</button>
+    </div>
+  </div>
+
+  <!-- Next prayer countdown -->
+  <div class="next-prayer-card">
+    <div class="label">الصلاة القادمة:</div>
+    <div class="next-prayer-name" id="nextPrayerName">--</div>
+    <div class="next-prayer-timer" id="nextPrayerTimer">--:--:--</div>
+  </div>
+
+  <!-- Grid of Prayer Times -->
+  <div class="prayers-grid">
+    <div class="prayer-box" data-prayer="Fajr">
+      <span class="icon">🌌</span>
+      <span class="name">الفجر</span>
+      <span class="time" id="time-Fajr">--:--</span>
+    </div>
+
+    <div class="prayer-box" data-prayer="Sunrise">
+      <span class="icon">🌅</span>
+      <span class="name">الشروق</span>
+      <span class="time" id="time-Sunrise">--:--</span>
+    </div>
+
+    <div class="prayer-box" data-prayer="Dhuhr">
+      <span class="icon">☀️</span>
+      <span class="name">الظهر</span>
+      <span class="time" id="time-Dhuhr">--:--</span>
+    </div>
+
+    <div class="prayer-box" data-prayer="Asr">
+      <span class="icon">🌤️</span>
+      <span class="name">العصر</span>
+      <span class="time" id="time-Asr">--:--</span>
+    </div>
+
+    <div class="prayer-box" data-prayer="Maghrib">
+      <span class="icon">🌇</span>
+      <span class="name">المغرب</span>
+      <span class="time" id="time-Maghrib">--:--</span>
+    </div>
+
+    <div class="prayer-box" data-prayer="Isha">
+      <span class="icon">🌙</span>
+      <span class="name">العشاء</span>
+      <span class="time" id="time-Isha">--:--</span>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/footer') %>

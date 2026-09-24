@@ -1,0 +1,18 @@
+<header class="main-header">
+  <div class="container navbar-content">
+    <div class="logo">
+      <a href="/">ذكّر</a>
+    </div>
+    <nav class="nav-links">
+      <a href="/" class="<%= currentPage === 'home' ? 'active' : '' %>">الرئيسية</a>
+      <a href="/morning" class="<%= currentPage === 'morning' ? 'active' : '' %>">أذكار الصباح</a>
+      <a href="/evening" class="<%= currentPage === 'evening' ? 'active' : '' %>">أذكار المساء</a>
+      <a href="/prayers" class="<%= currentPage === 'prayers' ? 'active' : '' %>">مواقيت الصلاة</a>
+    </nav>
+    <div class="nav-actions">
+      <button id="notifyBtn" class="btn-notify" title="تفعيل الإشعارات والتذكير">
+        تفعيل التنبيهات
+      </button>
+    </div>
+  </div>
+</header>
