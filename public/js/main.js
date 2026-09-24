@@ -404,6 +404,7 @@ function startNextPrayerCountdown(timings) {
 document.addEventListener('DOMContentLoaded', () => {
   initNotifications();
   initAzkarCounters();
+  initFontSizeControls();
 
   // فحص أذكار الصباح والمساء كل دقيقة
   setInterval(checkAzkarReminders, 60000);
@@ -432,29 +433,46 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchPrayerTimesByCity('Cairo', 'Egypt');
 });
 
-// التحكم بحجم خط الأذكار (إن وجدت في الصفحة)
-const zekkr = document.getElementById('zekr-text');
-const fontPlusBtn = document.getElementById('font-plus');
-const fontMinusBtn = document.getElementById('font-minus');
-const fontResetBtn = document.getElementById('font-reset');
+// ----------------------------------------------------
+// 5. التحكم بحجم خط جميع الأذكار (Font Size Controls)
+// ----------------------------------------------------
+const DEFAULT_ZEKR_FONT_SIZE = 23; // الحجم الافتراضي المريح (1.45rem)
+let currentZekrFontSize = parseInt(localStorage.getItem('zakker_font_size') || DEFAULT_ZEKR_FONT_SIZE, 10);
 
-function increaseFontSize() {
-  if (!zekkr) return;
-  const currentFontSize = parseInt(zekkr.style.fontSize || '16', 10);
-  zekkr.style.fontSize = `${currentFontSize + 2}px`;
+function applyZekrFontSize(size) {
+  currentZekrFontSize = Math.min(38, Math.max(16, size));
+  const zekrElements = document.querySelectorAll('.zekr-text');
+  zekrElements.forEach(el => {
+    el.style.fontSize = `${currentZekrFontSize}px`;
+  });
+  localStorage.setItem('zakker_font_size', currentZekrFontSize);
 }
 
-function decreaseFontSize() {
-  if (!zekkr) return;
-  const currentFontSize = parseInt(zekkr.style.fontSize || '16', 10);
-  zekkr.style.fontSize = `${currentFontSize - 2}px`;
-}
+function initFontSizeControls() {
+  const fontPlusBtn = document.getElementById('font-plus');
+  const fontMinusBtn = document.getElementById('font-minus');
+  const fontResetBtn = document.getElementById('font-reset');
 
-function resetFontSize() {
-  if (!zekkr) return;
-  zekkr.style.fontSize = '16px';
-}
+  // تطبيق الحجم المحفوظ سابقاً لجميع البطاقات
+  if (document.querySelector('.zekr-text')) {
+    applyZekrFontSize(currentZekrFontSize);
+  }
 
-if (fontPlusBtn) fontPlusBtn.addEventListener('click', increaseFontSize);
-if (fontMinusBtn) fontMinusBtn.addEventListener('click', decreaseFontSize);
-if (fontResetBtn) fontResetBtn.addEventListener('click', resetFontSize);
+  if (fontPlusBtn) {
+    fontPlusBtn.addEventListener('click', () => {
+      applyZekrFontSize(currentZekrFontSize + 2);
+    });
+  }
+
+  if (fontMinusBtn) {
+    fontMinusBtn.addEventListener('click', () => {
+      applyZekrFontSize(currentZekrFontSize - 2);
+    });
+  }
+
+  if (fontResetBtn) {
+    fontResetBtn.addEventListener('click', () => {
+      applyZekrFontSize(DEFAULT_ZEKR_FONT_SIZE);
+    });
+  }
+}
