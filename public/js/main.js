@@ -67,6 +67,80 @@ async function subscribeUserToPush() {
   }
 }
 
+function updateNotificationButtonUI() {
+  if (!notifyBtn) return;
+  if (!('Notification' in window)) {
+    notifyBtn.style.display = 'none';
+    return;
+  }
+
+  const permission = Notification.permission;
+  if (permission === 'granted') {
+    notifyBtn.className = 'btn-notify granted';
+    notifyBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      <span>الإشعارات مفعلة</span>
+    `;
+    notifyBtn.title = 'التنبيهات مفعلة بنجاح';
+  } else if (permission === 'denied') {
+    notifyBtn.className = 'btn-notify denied';
+    notifyBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      <span>الإشعارات محظورة (اضغط للحل)</span>
+    `;
+    notifyBtn.title = 'المتصفح يحظر الإشعارات - اضغط لمعرفة خطوات فك الحظر';
+  } else {
+    notifyBtn.className = 'btn-notify';
+    notifyBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+      <span>تفعيل التنبيهات</span>
+    `;
+    notifyBtn.title = 'تفعيل الإشعارات والتذكير';
+  }
+}
+
+function openNotificationModal(type) {
+  const overlay = document.getElementById('notifyModalOverlay');
+  const softContent = document.getElementById('notifySoftPromptContent');
+  const blockedContent = document.getElementById('notifyBlockedContent');
+
+  if (!overlay) return;
+
+  overlay.style.display = 'flex';
+  if (type === 'blocked') {
+    if (softContent) softContent.style.display = 'none';
+    if (blockedContent) blockedContent.style.display = 'block';
+  } else {
+    if (blockedContent) blockedContent.style.display = 'none';
+    if (softContent) softContent.style.display = 'block';
+  }
+}
+
+function closeNotificationModal() {
+  const overlay = document.getElementById('notifyModalOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+async function requestNotificationPermission() {
+  closeNotificationModal();
+
+  try {
+    const permission = await Notification.requestPermission();
+    updateNotificationButtonUI();
+
+    if (permission === 'granted') {
+      if (swRegistration) {
+        await subscribeUserToPush();
+      }
+      showNotification('تطبيق ذكّر 🕌', 'تم تفعيل التنبيهات بنجاح! ستصلك إشعارات الأذان والأذكار حتى لو كان الموقع مغلقاً.');
+    } else if (permission === 'denied') {
+      openNotificationModal('blocked');
+    }
+  } catch (error) {
+    console.error('خطأ في طلب الإشعارات:', error);
+  }
+}
+
 function initNotifications() {
   registerServiceWorker();
 
@@ -75,21 +149,42 @@ function initNotifications() {
     return;
   }
 
-  if (Notification.permission === 'granted') {
-    if (notifyBtn) notifyBtn.textContent = 'الإشعارات مفعلة ✓';
+  updateNotificationButtonUI();
+
+  // مستمعات النافذة المنبثقة
+  const overlay = document.getElementById('notifyModalOverlay');
+  const closeBtn = document.getElementById('notifyModalCloseBtn');
+  const softCancelBtn = document.getElementById('notifySoftCancelBtn');
+  const softConfirmBtn = document.getElementById('notifySoftConfirmBtn');
+  const blockedCloseBtn = document.getElementById('notifyBlockedCloseBtn');
+  const reloadBtn = document.getElementById('notifyReloadBtn');
+
+  if (closeBtn) closeBtn.addEventListener('click', closeNotificationModal);
+  if (softCancelBtn) softCancelBtn.addEventListener('click', closeNotificationModal);
+  if (blockedCloseBtn) blockedCloseBtn.addEventListener('click', closeNotificationModal);
+  if (reloadBtn) reloadBtn.addEventListener('click', () => window.location.reload());
+
+  if (overlay) {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeNotificationModal();
+    });
   }
 
+  if (softConfirmBtn) {
+    softConfirmBtn.addEventListener('click', () => {
+      requestNotificationPermission();
+    });
+  }
+
+  // عند الضغط على زر التنبيهات في شريط التنقل
   if (notifyBtn) {
-    notifyBtn.addEventListener('click', async () => {
-      const permission = await Notification.requestPermission();
-      if (permission === 'granted') {
-        notifyBtn.textContent = 'الإشعارات مفعلة ✓';
-        if (swRegistration) {
-          await subscribeUserToPush();
-        }
-        showNotification('تطبيق ذكّر 🕌', 'تم تفعيل التنبيهات بنجاح! ستصلك إشعارات الأذان والأذكار حتى لو كان الموقع مغلقاً.');
+    notifyBtn.addEventListener('click', () => {
+      if (Notification.permission === 'granted') {
+        showNotification('تطبيق ذكّر 🕌', 'التنبيهات مفعلة لديك بالفعل وتعمل في الخلفية.');
+      } else if (Notification.permission === 'denied') {
+        openNotificationModal('blocked');
       } else {
-        alert('تم رفض الإشعارات. يرجى تفعيلها من إعدادات المتصفح.');
+        openNotificationModal('soft');
       }
     });
   }
@@ -336,3 +431,30 @@ document.addEventListener('DOMContentLoaded', () => {
   // جلب المواقيت الافتراضية
   fetchPrayerTimesByCity('Cairo', 'Egypt');
 });
+
+// التحكم بحجم خط الأذكار (إن وجدت في الصفحة)
+const zekkr = document.getElementById('zekr-text');
+const fontPlusBtn = document.getElementById('font-plus');
+const fontMinusBtn = document.getElementById('font-minus');
+const fontResetBtn = document.getElementById('font-reset');
+
+function increaseFontSize() {
+  if (!zekkr) return;
+  const currentFontSize = parseInt(zekkr.style.fontSize || '16', 10);
+  zekkr.style.fontSize = `${currentFontSize + 2}px`;
+}
+
+function decreaseFontSize() {
+  if (!zekkr) return;
+  const currentFontSize = parseInt(zekkr.style.fontSize || '16', 10);
+  zekkr.style.fontSize = `${currentFontSize - 2}px`;
+}
+
+function resetFontSize() {
+  if (!zekkr) return;
+  zekkr.style.fontSize = '16px';
+}
+
+if (fontPlusBtn) fontPlusBtn.addEventListener('click', increaseFontSize);
+if (fontMinusBtn) fontMinusBtn.addEventListener('click', decreaseFontSize);
+if (fontResetBtn) fontResetBtn.addEventListener('click', resetFontSize);

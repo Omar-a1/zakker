@@ -17,11 +17,20 @@
               <% if (item.category) { %><span class="zekr-badge"><%= item.category %></span><% } %>
             </div>
           <% } %>
-          <p class="zekr-text"><%= item.text %></p>
+          <p class="zekr-text" id="zekr-text"><%= item.text %></p>
           <% if (item.virtue) { %>
             <div class="zekr-virtue"><%= item.virtue %></div>
           <% } %>
         </div>
+        <button class="zekr-counter-btn" id="font-plus" data-target="<%= item.count %>" data-current="0" style="margin-bottom: 10px; display: flex; justify-content: center;width: 100px;">
+            تكبير الخط
+          </button>
+          <button class="zekr-counter-btn" id="font-minus" data-target="<%= item.count %>" data-current="0" style="margin-bottom: 10px; display: flex; justify-content: center;">
+            تصغير الخط
+          </button>
+          <button class="zekr-counter-btn" id="font-reset" data-target="<%= item.count %>" data-current="0" style="margin-bottom: 10px; display: flex; justify-content: center;">
+            اعادة الخط
+          </button>
         <div class="zekr-footer">
           <span class="zekr-target">التكرار: <strong><%= item.count %></strong></span>
           <button class="zekr-counter-btn" data-target="<%= item.count %>" data-current="0">
