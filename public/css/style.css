@@ -353,7 +353,11 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
   align-items: center;
   gap: 0.5rem;
 }
-
+.font-btn-group{
+  display: flex;
+  gap: 10px;
+  margin: 1.2rem 0
+}
 .font-control-label {
   font-size: 0.9rem;
   color: var(--text-muted);
@@ -631,6 +635,9 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
   gap: 0.5rem;
   transition: all 0.2s ease;
   user-select: none;
+  width: 90%;
+  text-align: center;
+  justify-content: center;
 }
 
 .zekr-counter-btn:hover {
