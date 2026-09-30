@@ -4,8 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="google-site-verification" content="boPl-ZgmIbMQPQSdK23AOmAKdVpXt9VeDDMsTyRbxnU" />
+  
   <title><%= pageTitle %></title>
   
+  <!-- وصف الموقع للبحث (مهم جداً للـ SEO والكلمات المفتاحية) -->
+  <meta name="description" content="<%= typeof pageDescription !== 'undefined' ? pageDescription : 'منصة ذكّر - تطبيق وموقع ذكّر لتنظيم الوقت والمذاكرة والتذكير بالمشروعات والمهام.' %>">
+  
+  <!-- الكلمات المفتاحية بالتشكيل وبدونه -->
+  <meta name="keywords" content="ذكّر, ذكر, منصة ذكر, zakker, تطبيق ذكر, موقع ذكر">
+  
+  <!-- Open Graph / Facebook / Discord (علشان لما تشير اللينك يظهر بصورة ومعلومات صح) -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="<%= pageTitle %>">
+  <meta property="og:description" content="<%= typeof pageDescription !== 'undefined' ? pageDescription : 'منصة ذكّر للتذكير وتنظيم المهام' %>">
+  <meta property="og:image" content="/zakker logo-modified.png">
+
   <!-- منع وميض الوضع الليلي عند تحميل الصفحة -->
   <script>
     (function() {
@@ -15,10 +28,12 @@
       } catch(e) {}
     })();
   </script>
+  
   <!-- Google Fonts: Amiri & Cairo -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  
   <!-- Thmanyah Fonts -->
   <link rel="stylesheet" href="/css/thmanyah.css">
   <!-- Main Stylesheet -->
