@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const webpush = require('web-push');
+const cron = require('node-cron');
 require('dotenv').config();
 
 const app = express();
@@ -36,6 +37,42 @@ function saveSubscriptions(subs) {
   } catch (err) {
     console.error('خطأ في حفظ الاشتراكات:', err);
   }
+}
+
+// دالة إرسال إشعار Push موحدة لجميع الأجهزة المشتركة
+async function sendPushToAllSubscribers(notificationData) {
+  const subs = getSubscriptions();
+  if (!subs.length) return { sent: 0, total: 0 };
+
+  const payload = JSON.stringify({
+    title: notificationData.title || 'تطبيق ذكّر 🕌',
+    body: notificationData.body || 'حان وقت الذكر والصلاة، ألا بذكر الله تطمئن القلوب.',
+    url: notificationData.url || '/',
+    tag: notificationData.tag || 'zakker-notification'
+  });
+
+  let successful = 0;
+  const remainingSubs = [];
+
+  for (const sub of subs) {
+    try {
+      await webpush.sendNotification(sub, payload);
+      successful++;
+      remainingSubs.push(sub);
+    } catch (err) {
+      console.warn('تعذر إرسال الإشعار لمشترك:', err.statusCode);
+      // حذف الاشتراكات غير الصالحة المنتهية (404 أو 410)
+      if (err.statusCode !== 404 && err.statusCode !== 410) {
+        remainingSubs.push(sub);
+      }
+    }
+  }
+
+  if (remainingSubs.length !== subs.length) {
+    saveSubscriptions(remainingSubs);
+  }
+
+  return { sent: successful, total: subs.length };
 }
 
 // Middleware
@@ -109,41 +146,113 @@ app.post('/api/subscribe', (req, res) => {
     saveSubscriptions(subs);
   }
 
-  res.status(201).json({ message: 'تم الاشتراك بنجاح وتفعيل إشعارات الخلفية' });
+  res.status(201).json({ message: 'تم الاشتراك بنجاح وتفعيل إشعارات الخلفية عبر Web Push' });
 });
 
-// 8. Web Push: Send notification to all subscribers
+// 8. Web Push: Send notification immediately (API)
 app.post('/api/send-notification', async (req, res) => {
   const { title, body, url } = req.body;
-  const payload = JSON.stringify({
-    title: title || 'تطبيق ذكّر 🕌',
-    body: body || 'حان وقت الذكر والصلاة، ألا بذكر الله تطمئن القلوب.',
-    url: url || '/'
+  const result = await sendPushToAllSubscribers({ title, body, url });
+  res.json({ success: true, ...result });
+});
+
+// 9. Web Push: Test background push with delay
+app.post('/api/test-delayed-push', (req, res) => {
+  const seconds = parseInt(req.body.seconds || 5, 10);
+  setTimeout(async () => {
+    console.log('[Test Push] إرسال إشعار تجريبي في الخلفية...');
+    await sendPushToAllSubscribers({
+      title: 'ذكّر: تجربة إشعار في الخلفية 🕌',
+      body: 'وصلك هذا الإشعار بنجاح عبر Web Push حتى والموقع مغلق تماماً!',
+      url: '/',
+      tag: 'test-push'
+    });
+  }, seconds * 1000);
+
+  res.json({ 
+    success: true, 
+    message: `سيتم إرسال إشعار Web Push تجريبي بعد ${seconds} ثوانٍ. اغلق المتصفح أو النافذة لتجربته!` 
   });
+});
 
-  const subs = getSubscriptions();
-  let successful = 0;
-  const remainingSubs = [];
+// ====================================================
+// نظام جدولة التنبيهات في الخلفية عبر السيرفر (Node-Cron)
+// ====================================================
 
-  for (const sub of subs) {
-    try {
-      await webpush.sendNotification(sub, payload);
-      successful++;
-      remainingSubs.push(sub);
-    } catch (err) {
-      console.warn('تعذر إرسال الإشعار لمشترك:', err.statusCode);
-      // حذف الاشتراكات المنتهية (404 / 410)
-      if (err.statusCode !== 404 && err.statusCode !== 410) {
-        remainingSubs.push(sub);
-      }
+// 1. تنبيه أذكار الصباح يومياً الساعة 06:30 صباحاً
+cron.schedule('30 6 * * *', async () => {
+  console.log('[Cron] إرسال تنبيه أذكار الصباح في الخلفية لجميع المشتركين...');
+  await sendPushToAllSubscribers({
+    title: 'أذكار الصباح 🌅',
+    body: 'حان الآن وقت أذكار الصباح، ابدأ يومك بذكر الله وحصّن نفسك طوال النهار.',
+    url: '/morning',
+    tag: 'morning-azkar'
+  });
+});
+
+// 2. تنبيه أذكار المساء يومياً الساعة 17:00 (5:00 عصراً/مساءً)
+cron.schedule('0 17 * * *', async () => {
+  console.log('[Cron] إرسال تنبيه أذكار المساء في الخلفية لجميع المشتركين...');
+  await sendPushToAllSubscribers({
+    title: 'أذكار المساء 🌇',
+    body: 'حان الآن وقت أذكار المساء، ألا بذكر الله تطمئن القلوب، حصّن نفسك حتى تصبح.',
+    url: '/evening',
+    tag: 'evening-azkar'
+  });
+});
+
+// 3. جلب مواقيت الصلاة وفحصها في الخلفية
+let todayPrayerTimings = null;
+let lastNotifiedMinute = null;
+
+async function refreshPrayerTimes() {
+  try {
+    const response = await fetch('https://api.aladhan.com/v1/timingsByCity?city=Cairo&country=Egypt&method=5');
+    const data = await response.json();
+    if (data.code === 200) {
+      todayPrayerTimings = data.data.timings;
+      console.log('[Prayer Scheduler] تم تحديث مواقيت صلاة اليوم بنجاح.');
+    }
+  } catch (e) {
+    console.error('[Prayer Scheduler] تعذر جلب مواقيت الصلاة للسيرفر:', e.message);
+  }
+}
+
+// تحديث يومي عند 00:05 وعمل فحص عند إقلاع السيرفر
+cron.schedule('5 0 * * *', refreshPrayerTimes);
+refreshPrayerTimes();
+
+// فحص كل دقيقة لمطابقة توقيت الصلوات الخمس
+cron.schedule('* * * * *', async () => {
+  if (!todayPrayerTimings) return;
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const currentHM = `${hours}:${minutes}`;
+
+  if (lastNotifiedMinute === currentHM) return;
+
+  const prayersMap = {
+    Fajr: 'الفجر',
+    Dhuhr: 'الظهر',
+    Asr: 'العصر',
+    Maghrib: 'المغرب',
+    Isha: 'العشاء'
+  };
+
+  for (const [key, name] of Object.entries(prayersMap)) {
+    if (todayPrayerTimings[key] && todayPrayerTimings[key].slice(0, 5) === currentHM) {
+      lastNotifiedMinute = currentHM;
+      console.log(`[Prayer Scheduler] إرسال تنبيه أذان صلاة ${name} عبر Web Push...`);
+      await sendPushToAllSubscribers({
+        title: `حان الآن موعد أذان ${name} 🕌`,
+        body: `حي على الصلاة، حي على الفلاح. تذكير بموعد صلاة ${name}.`,
+        url: '/prayers',
+        tag: `prayer-${key}`
+      });
+      break;
     }
   }
-
-  if (remainingSubs.length !== subs.length) {
-    saveSubscriptions(remainingSubs);
-  }
-
-  res.json({ success: true, sent: successful, total: subs.length });
 });
 
 // Start Server

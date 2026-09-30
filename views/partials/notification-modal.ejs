@@ -11,70 +11,106 @@
     <!-- الحالة الأولى: تمهيد قبل طلب إذن المتصفح (Soft Prompt) -->
     <div id="notifySoftPromptContent" class="notify-modal-body" style="display: none;">
       <div class="notify-modal-icon pulse-soft">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--primary-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
           <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
         </svg>
       </div>
-      <h3 id="modalTitle" class="notify-modal-title">تفعيل تنبيهات ذكّر</h3>
+      <h3 id="modalTitle" class="notify-modal-title">تفعيل تنبيهات ذكّر في الخلفية</h3>
       <p class="notify-modal-desc">
-        احرص على ألا تفوتك أذكار الصباح والمساء ومواعيد الصلوات الخمس. سنرسل لك تنبيهاً خفيفاً في وقته حتى لو كان المتصفح مغلقاً.
+        احرص على ألا تفوتك أذكار الصباح والمساء ومواعيد الصلوات الخمس. ستصلك التنبيهات في وقتها حتى لو كان الموقع مغلقاً تماماً عبر نظام Web Push.
       </p>
       <div class="notify-modal-features">
-        <div class="feature-item">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-          <span>تذكير بأذكار الصباح والمساء</span>
+        <div class="notify-feature-item">
+          <span class="feature-badge">🌅 06:30 ص</span>
+          <div class="feature-info">
+            <strong>أذكار الصباح</strong>
+            <p>تذكير يومي لبدء يومك ببركة وحصن متين.</p>
+          </div>
         </div>
-        <div class="feature-item">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-          <span>تنبيه بدخول وقت الأذان والصلاة</span>
+        <div class="notify-feature-item">
+          <span class="feature-badge">🌇 05:00 م</span>
+          <div class="feature-info">
+            <strong>أذكار المساء</strong>
+            <p>تذكير لحفظ النفس والسكينة حتى تصبح.</p>
+          </div>
         </div>
-        <div class="feature-item">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-          <span>يعمل في الخلفية بدون استهلاك للبطارية</span>
+        <div class="notify-feature-item">
+          <span class="feature-badge">🕌 الأذان</span>
+          <div class="feature-info">
+            <strong>الصلوات الخمس</strong>
+            <p>إشعار مباشر بدخول وقت كل صلاة من السيرفر.</p>
+          </div>
         </div>
       </div>
       <div class="notify-modal-actions">
-        <button id="notifySoftConfirmBtn" class="btn-modal-primary">متابعة والسماح للتنبيهات</button>
+        <button id="notifySoftConfirmBtn" class="btn-modal-primary">تفعيل واشتراك الآن</button>
         <button id="notifySoftCancelBtn" class="btn-modal-secondary">لاحقاً</button>
       </div>
     </div>
 
-    <!-- الحالة الثانية: إرشادات حل مشكلة الحظر (Unblock Guide) -->
+    <!-- الحالة الثانية: التنبيهات مفعلة بالفعل (Active State & Test Push) -->
+    <div id="notifyActiveContent" class="notify-modal-body" style="display: none;">
+      <div class="notify-modal-icon pulse-soft">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+      <h3 class="notify-modal-title">التنبيهات مفعلة بنجاح ✓</h3>
+      <p class="notify-modal-desc">
+        جهازك متصل بخادم الإشعارات السحابي (Web Push). ستصلك تنبيهات الأذكار والأذان تلقائياً في الخلفية حتى ولو كان المتصفح مغلقاً.
+      </p>
+      <div class="notify-modal-features">
+        <div class="notify-feature-item">
+          <span class="feature-badge">مجدول</span>
+          <div class="feature-info">
+            <strong>أذكار الصباح والمساء والصلوات</strong>
+            <p>يعمل السيرفر على مدار الساعة عبر Web Push API لتنبيهك دون الحاجة لفتح الموقع.</p>
+          </div>
+        </div>
+      </div>
+      <div class="notify-modal-actions">
+        <button id="notifyTestPushBtn" class="btn-modal-primary">تجربة إشعار في الخلفية (بعد 5 ثوانٍ)</button>
+        <button id="notifyActiveCloseBtn" class="btn-modal-secondary">إغلاق</button>
+      </div>
+      <div id="notifyTestStatus" style="font-size: 0.85rem; color: var(--primary-color); margin-top: 0.75rem; display: none;"></div>
+    </div>
+
+    <!-- الحالة الثالثة: إرشادات حل مشكلة الحظر (Unblock Guide) -->
     <div id="notifyBlockedContent" class="notify-modal-body" style="display: none;">
       <div class="notify-modal-icon warning-badge">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
           <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
         </svg>
       </div>
       <h3 class="notify-modal-title">الإشعارات محظورة في متصفحك</h3>
       <p class="notify-modal-desc">
-        قام المتصفح بحظر طلب الإشعارات تلقائياً أو تم رفضها سابقاً. لإعادة تفعيلها، يرجى اتباع هذه الخطوات البسيطة:
+        قام المتصفح بحظر الإشعارات سابقاً. لإعادة استقبال التنبيهات في الخلفية، يرجى اتباع هذه الخطوات:
       </p>
 
-      <div class="notify-steps">
-        <div class="step-card">
+      <div class="notify-steps-guide">
+        <div class="notify-step">
           <span class="step-number">1</span>
           <div class="step-text">
             <strong>اضغط على أيقونة الإعدادات أو القفل</strong>
-            <p>تجدها في أعلى المتصفح بجانب رابط الموقع (شريط العنوان).</p>
+            <p>بجانب رابط الموقع في شريط العنوان بالأعلى.</p>
           </div>
         </div>
 
-        <div class="step-card">
+        <div class="notify-step">
           <span class="step-number">2</span>
           <div class="step-text">
             <strong>غيّر الإذن إلى "سماح" (Allow)</strong>
-            <p>ابحث عن خيار <strong>الإشعارات (Notifications)</strong> وحوّله من "حظر" إلى "سماح".</p>
+            <p>اختر الإشعارات وحوّلها إلى السماح.</p>
           </div>
         </div>
 
-        <div class="step-card">
+        <div class="notify-step">
           <span class="step-number">3</span>
           <div class="step-text">
             <strong>تحديث الصفحة</strong>
-            <p>اضغط على زر التحديث أدناه لتفعيل التنبيهات مباشرة.</p>
+            <p>اضغط الزر بالأسفل لإعادة تحميل الصفحة وتأكيد التفعيل.</p>
           </div>
         </div>
       </div>
