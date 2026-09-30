@@ -39,6 +39,51 @@
   --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.6);
 }
 
+/* ==================================================== */
+/* Custom Sleek Scrollbar */
+/* ==================================================== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-color);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+  border: 2px solid var(--bg-color);
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-color);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 var(--bg-color);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: var(--bg-color);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #253347;
+  border: 2px solid var(--bg-color);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-color);
+}
+
+[data-theme="dark"] * {
+  scrollbar-color: #253347 var(--bg-color);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -107,14 +152,6 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
 
 .logo a:hover {
   opacity: 0.9;
-}
-
-.logo-dot {
-  width: 6px;
-  height: 6px;
-  background: var(--primary-light);
-  border-radius: 50%;
-  display: inline-block;
 }
 
 /* Desktop Navigation Links */
@@ -199,36 +236,16 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
   display: none;
 }
 
-/* Notification Bell States */
-.notify-status-dot {
-  position: absolute;
-  top: 7px;
-  right: 7px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #94a3b8;
-  border: 2px solid var(--card-bg);
-  transition: background-color 0.2s ease;
-}
-
 .btn-notify-compact.granted {
   color: var(--primary-color);
-  border-color: rgba(20, 184, 166, 0.4);
-}
-
-.btn-notify-compact.granted .notify-status-dot {
-  background: #10b981;
-  box-shadow: 0 0 6px rgba(16, 185, 129, 0.7);
+  border-color: var(--primary-color);
+  background: rgba(20, 184, 166, 0.1);
 }
 
 .btn-notify-compact.denied {
   color: #ef4444;
-  border-color: rgba(239, 68, 68, 0.3);
-}
-
-.btn-notify-compact.denied .notify-status-dot {
-  background: #ef4444;
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.1);
 }
 
 /* Mobile Nav Bar */
@@ -678,10 +695,27 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
   cursor: pointer;
   transition: all 0.2s;
 }
-
+.btn-primary{
+  background: var(--primary-color);
+  color: #ffffff;
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 0.65rem 1.25rem;
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-primary:hover{
+  background: var(--primary-dark);
+  border-color: var(--primary-color);
+  color: #ffffff;
+}
 .btn-secondary:hover {
   background: var(--bg-color);
   border-color: var(--primary-color);
+  color: #ffffff;
 }
 
 .prayers-grid {

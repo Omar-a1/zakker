@@ -127,6 +127,32 @@ app.get('/api/azkar', (req, res) => {
   res.json(azkarData);
 });
 
+// 5.1 API proxy for Prayer Times with server-side cache/fallback
+app.get('/api/prayers', async (req, res) => {
+  const city = req.query.city || 'Cairo';
+  const country = req.query.country || 'Egypt';
+  try {
+    const response = await fetch(`https://api.aladhan.com/v1/timingsByCity?city=${encodeURIComponent(city)}&country=${encodeURIComponent(country)}&method=5`);
+    const data = await response.json();
+    if (data.code === 200) {
+      return res.json(data);
+    }
+  } catch (err) {
+    console.warn('تعذر جلب المواقيت مباشرة من Aladhan API، استخدام النسخة الاحتياطية:', err.message);
+  }
+
+  if (todayPrayerTimings) {
+    return res.json({
+      code: 200,
+      data: {
+        timings: todayPrayerTimings
+      }
+    });
+  }
+
+  res.status(500).json({ error: 'تعذر جلب مواقيت الصلاة' });
+});
+
 // 6. Web Push: Get Public VAPID Key
 app.get('/api/vapid-public-key', (req, res) => {
   res.json({ publicKey: process.env.VAPID_PUBLIC_KEY || '' });

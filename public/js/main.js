@@ -109,7 +109,6 @@ function updateNotificationButtonUI() {
         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
         <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
       </svg>
-      <span class="notify-status-dot"></span>
     `;
   } else if (permission === 'denied') {
     notifyBtn.classList.add('denied');
@@ -120,7 +119,6 @@ function updateNotificationButtonUI() {
         <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
         <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2"></line>
       </svg>
-      <span class="notify-status-dot"></span>
     `;
   } else {
     notifyBtn.title = 'تفعيل التنبيهات والأذكار في الخلفية';
@@ -129,7 +127,6 @@ function updateNotificationButtonUI() {
         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
         <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
       </svg>
-      <span class="notify-status-dot"></span>
     `;
   }
 }
@@ -323,15 +320,90 @@ const prayerNamesArabic = {
 let cachedTimings = null;
 let prayerTimerInterval = null;
 
-// جلب المواقيت بالمدينة والدولة
-async function fetchPrayerTimesByCity(city = 'Cairo', country = 'Egypt') {
-  try {
-    const response = await fetch(`https://api.aladhan.com/v1/timingsByCity?city=${encodeURIComponent(city)}&country=${encodeURIComponent(country)}&method=5`);
-    const data = await response.json();
+// قاموس تحويل أسماء المدن والدول العربية الشائعة
+const ARABIC_CITY_MAP = {
+  'القاهرة': 'Cairo',
+  'الجيزة': 'Giza',
+  'الاسكندرية': 'Alexandria',
+  'الإسكندرية': 'Alexandria',
+  'الرياض': 'Riyadh',
+  'مكة': 'Makkah',
+  'مكة المكرمة': 'Makkah',
+  'المدينة': 'Madinah',
+  'المدينة المنورة': 'Madinah',
+  'جدة': 'Jeddah',
+  'الدمام': 'Dammam',
+  'دبي': 'Dubai',
+  'أبوظبي': 'Abu Dhabi',
+  'ابوظبي': 'Abu Dhabi',
+  'الشارقة': 'Sharjah',
+  'عمان': 'Amman',
+  'الكويت': 'Kuwait',
+  'الدوحة': 'Doha',
+  'المنامة': 'Manama',
+  'مسقط': 'Muscat',
+  'بغداد': 'Baghdad',
+  'دمشق': 'Damascus',
+  'بيروت': 'Beirut',
+  'القدس': 'Jerusalem',
+  'طرابلس': 'Tripoli',
+  'تونس': 'Tunis',
+  'الجزائر': 'Algiers',
+  'الرباط': 'Rabat',
+  'صنعاء': 'Sanaa'
+};
 
-    if (data.code === 200) {
+const ARABIC_COUNTRY_MAP = {
+  'مصر': 'Egypt',
+  'السعودية': 'Saudi Arabia',
+  'المملكة العربية السعودية': 'Saudi Arabia',
+  'الإمارات': 'United Arab Emirates',
+  'الامارات': 'United Arab Emirates',
+  'الأردن': 'Jordan',
+  'الاردن': 'Jordan',
+  'الكويت': 'Kuwait',
+  'قطر': 'Qatar',
+  'البحرين': 'Bahrain',
+  'عمان': 'Oman',
+  'العراق': 'Iraq',
+  'سوريا': 'Syria',
+  'لبنان': 'Lebanon',
+  'فلسطين': 'Palestine',
+  'ليبيا': 'Libya',
+  'تونس': 'Tunisia',
+  'الجزائر': 'Algeria',
+  'المغرب': 'Morocco',
+  'اليمن': 'Yemen',
+  'السودان': 'Sudan'
+};
+
+// جلب المواقيت بالمدينة والدولة مع دعم كامل للاسم العربي والاتصال البديل
+async function fetchPrayerTimesByCity(city = 'Cairo', country = 'Egypt') {
+  const cleanCity = (city || 'Cairo').trim();
+  const cleanCountry = (country || 'Egypt').trim();
+  const queryCity = ARABIC_CITY_MAP[cleanCity] || cleanCity;
+  const queryCountry = ARABIC_COUNTRY_MAP[cleanCountry] || cleanCountry;
+
+  try {
+    let data = null;
+
+    // 1. محاولة الاتصال المباشر بـ Aladhan API
+    try {
+      const response = await fetch(`https://api.aladhan.com/v1/timingsByCity?city=${encodeURIComponent(queryCity)}&country=${encodeURIComponent(queryCountry)}&method=5`);
+      data = await response.json();
+    } catch (errDirect) {
+      console.warn('تعذر الاتصال الخارجي المباشر، جاري استخدام المسار المحلي للسيرفر...', errDirect.message);
+    }
+
+    // 2. إذا فشل الطلب الخارجي، نستخدم المسار المحلي للسيرفر
+    if (!data || data.code !== 200 || !data.data) {
+      const fallbackResponse = await fetch(`/api/prayers?city=${encodeURIComponent(queryCity)}&country=${encodeURIComponent(queryCountry)}`);
+      data = await fallbackResponse.json();
+    }
+
+    if (data && (data.code === 200 || data.data)) {
       cachedTimings = data.data.timings;
-      updatePrayerUI(cachedTimings, `${city}، ${country}`);
+      updatePrayerUI(cachedTimings, `${cleanCity}، ${cleanCountry}`);
       startNextPrayerCountdown(cachedTimings);
     }
   } catch (error) {
@@ -347,9 +419,18 @@ function fetchPrayerTimesByGeo() {
     navigator.geolocation.getCurrentPosition(async (pos) => {
       const { latitude, longitude } = pos.coords;
       try {
-        const response = await fetch(`https://api.aladhan.com/v1/timings?latitude=${latitude}&longitude=${longitude}&method=5`);
-        const data = await response.json();
-        if (data.code === 200) {
+        let data = null;
+        try {
+          const response = await fetch(`https://api.aladhan.com/v1/timings?latitude=${latitude}&longitude=${longitude}&method=5`);
+          data = await response.json();
+        } catch (e) {}
+
+        if (!data || data.code !== 200) {
+          const fallbackRes = await fetch('/api/prayers?city=Cairo&country=Egypt');
+          data = await fallbackRes.json();
+        }
+
+        if (data && (data.code === 200 || data.data)) {
           cachedTimings = data.data.timings;
           updatePrayerUI(cachedTimings, 'موقعك الحالي');
           startNextPrayerCountdown(cachedTimings);
@@ -368,7 +449,7 @@ function fetchPrayerTimesByGeo() {
   }
 }
 
-// تحديث واجهة المستخدم بالصلوات
+// تحديث واجهة المستخدم بالصلوات بمرونة كاملة لكل الحالات
 function updatePrayerUI(timings, locationName) {
   const locationDisplay = document.getElementById('locationDisplay');
   if (locationDisplay) locationDisplay.textContent = `مواقيت الصلاة حسب: ${locationName}`;
@@ -376,9 +457,12 @@ function updatePrayerUI(timings, locationName) {
   const prayers = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
 
   prayers.forEach(prayer => {
-    const el = document.getElementById(`time-${prayer.toLowerCase()}`);
+    // دعم جميع تسميات المعرفات (time-fajr أو time-Fajr أو داخل بطاقة الصلاة)
+    const el = document.getElementById(`time-${prayer.toLowerCase()}`) ||
+               document.getElementById(`time-${prayer}`) ||
+               document.querySelector(`[data-prayer="${prayer}"] .time`);
+
     if (el && timings[prayer]) {
-      // إزالة أي زيادات مثل (EEST)
       const cleanTime = timings[prayer].split(' ')[0];
       el.textContent = format12Hour(cleanTime);
     }
@@ -442,10 +526,10 @@ function startNextPrayerCountdown(timings) {
     const pad = (n) => n.toString().padStart(2, '0');
     const countdownStr = `متبقي: ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 
-    // تحديث عناصر الصفحة إن وجدت
+    // تحديث عناصر صفحة الصلوات إن وجدت
     const nameEl = document.getElementById('nextPrayerName');
     const timeEl = document.getElementById('nextPrayerTime');
-    const countEl = document.getElementById('nextPrayerCountdown');
+    const countEl = document.getElementById('nextPrayerTimer') || document.getElementById('nextPrayerCountdown');
 
     if (nameEl) nameEl.textContent = next.name;
     if (timeEl) timeEl.textContent = format12Hour(next.originalTime.split(' ')[0]);
