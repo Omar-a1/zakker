@@ -180,31 +180,6 @@ app.post('/api/subscribe', (req, res) => {
   res.status(201).json({ message: 'تم الاشتراك بنجاح وتفعيل إشعارات الخلفية عبر Web Push' });
 });
 
-// 8. Web Push: Send notification immediately (API)
-app.post('/api/send-notification', async (req, res) => {
-  const { title, body, url } = req.body;
-  const result = await sendPushToAllSubscribers({ title, body, url });
-  res.json({ success: true, ...result });
-});
-
-// 9. Web Push: Test background push with delay
-app.post('/api/test-delayed-push', (req, res) => {
-  const seconds = parseInt(req.body.seconds || 5, 10);
-  setTimeout(async () => {
-    console.log('[Test Push] إرسال إشعار تجريبي في الخلفية...');
-    await sendPushToAllSubscribers({
-      title: 'ذكّر: تجربة إشعار في الخلفية 🕌',
-      body: 'وصلك هذا الإشعار بنجاح عبر Web Push حتى والموقع مغلق تماماً!',
-      url: '/',
-      tag: 'test-push'
-    });
-  }, seconds * 1000);
-
-  res.json({ 
-    success: true, 
-    message: `سيتم إرسال إشعار Web Push تجريبي بعد ${seconds} ثوانٍ. اغلق المتصفح أو النافذة لتجربته!` 
-  });
-});
 
 // ====================================================
 // نظام جدولة التنبيهات في الخلفية عبر السيرفر (Node-Cron)
