@@ -59,7 +59,6 @@ zakker/
 | `/api/azkar` | `GET` | جلب بيانات الأذكار كاملة كـ JSON | كائن JSON يحتوي أذكار الصباح والمساء |
 | `/api/vapid-public-key` | `GET` | إرسال المفتاح العام للمتصفح لتشفير الاشتراك | `{ publicKey: "..." }` |
 | `/api/subscribe` | `POST` | حفظ اشتراك جهاز المستخدم لاستقبال الـ Push | حفظ في `subscriptions.json` وإرجاع 201 |
-| `/api/send-notification` | `POST` | إرسال إشعار فوري لجميع الأجهزة المشتركة | `{ success: true, sent: N, total: M }` |
 
 ---
 

@@ -196,8 +196,6 @@ function initNotifications() {
   const activeCloseBtn = document.getElementById('notifyActiveCloseBtn');
   const blockedCloseBtn = document.getElementById('notifyBlockedCloseBtn');
   const reloadBtn = document.getElementById('notifyReloadBtn');
-  const testPushBtn = document.getElementById('notifyTestPushBtn');
-  const testStatus = document.getElementById('notifyTestStatus');
 
   if (closeBtn) closeBtn.addEventListener('click', closeNotificationModal);
   if (softCancelBtn) softCancelBtn.addEventListener('click', closeNotificationModal);
@@ -214,34 +212,6 @@ function initNotifications() {
   if (softConfirmBtn) {
     softConfirmBtn.addEventListener('click', () => {
       requestNotificationPermission();
-    });
-  }
-
-  // تجربة إرسال إشعار في الخلفية مع مهلة 5 ثوانٍ
-  if (testPushBtn) {
-    testPushBtn.addEventListener('click', async () => {
-      testPushBtn.disabled = true;
-      testPushBtn.textContent = 'جارِ إعداد الإشعار...';
-      if (testStatus) {
-        testStatus.style.display = 'block';
-        testStatus.textContent = '⏳ سيصلك الإشعار بعد 5 ثوانٍ. يمكنك الآن إغلاق المتصفح أو تصغيره!';
-      }
-
-      try {
-        const res = await fetch('/api/test-delayed-push', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ seconds: 5 })
-        });
-        const data = await res.json();
-        setTimeout(() => {
-          testPushBtn.disabled = false;
-          testPushBtn.textContent = 'تجربة إشعار في الخلفية مرة أخرى';
-        }, 6000);
-      } catch (err) {
-        if (testStatus) testStatus.textContent = 'حدث خطأ في الاتصال بالخادم.';
-        testPushBtn.disabled = false;
-      }
     });
   }
 
