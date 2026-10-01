@@ -18,12 +18,14 @@ if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
 }
 
 // Subscriptions storage helper
-const SUBSCRIPTIONS_FILE = path.join(__dirname, 'data', 'subscriptions.json');
+const DATA_DIR = path.join(__dirname, 'data');
+const SUBSCRIPTIONS_FILE = path.join(DATA_DIR, 'subscriptions.json');
 
 function getSubscriptions() {
   try {
     if (fs.existsSync(SUBSCRIPTIONS_FILE)) {
-      return JSON.parse(fs.readFileSync(SUBSCRIPTIONS_FILE, 'utf-8'));
+      const content = fs.readFileSync(SUBSCRIPTIONS_FILE, 'utf-8');
+      return JSON.parse(content || '[]');
     }
   } catch (err) {
     console.error('خطأ في قراءة ملف الاشتراكات:', err);
@@ -33,6 +35,9 @@ function getSubscriptions() {
 
 function saveSubscriptions(subs) {
   try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
     fs.writeFileSync(SUBSCRIPTIONS_FILE, JSON.stringify(subs, null, 2));
   } catch (err) {
     console.error('خطأ في حفظ الاشتراكات:', err);
@@ -205,7 +210,26 @@ app.post('/api/test-delayed-push', (req, res) => {
 // نظام جدولة التنبيهات في الخلفية عبر السيرفر (Node-Cron)
 // ====================================================
 
-// 1. تنبيه أذكار الصباح يومياً الساعة 06:30 صباحاً
+function extractHHMM(value) {
+  const match = String(value || '').match(/(\d{1,2}):(\d{2})/);
+  if (!match) return '';
+  return `${match[1].padStart(2, '0')}:${match[2]}`;
+}
+
+function getCairoTimeHM() {
+  const cairoTimeStr = new Date().toLocaleTimeString('en-GB', {
+    timeZone: 'Africa/Cairo',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  });
+  return extractHHMM(cairoTimeStr);
+}
+
+const CRON_CAIRO_TZ = { timezone: 'Africa/Cairo' };
+
+// 1. تنبيه أذكار الصباح يومياً الساعة 06:30 صباحاً (توقيت القاهرة)
 cron.schedule('30 6 * * *', async () => {
   console.log('[Cron] إرسال تنبيه أذكار الصباح في الخلفية لجميع المشتركين...');
   await sendPushToAllSubscribers({
@@ -214,9 +238,9 @@ cron.schedule('30 6 * * *', async () => {
     url: '/morning',
     tag: 'morning-azkar'
   });
-});
+}, CRON_CAIRO_TZ);
 
-// 2. تنبيه أذكار المساء يومياً الساعة 17:00 (5:00 عصراً/مساءً)
+// 2. تنبيه أذكار المساء يومياً الساعة 17:00 (5:00 عصراً/مساءً بتوقيت القاهرة)
 cron.schedule('0 17 * * *', async () => {
   console.log('[Cron] إرسال تنبيه أذكار المساء في الخلفية لجميع المشتركين...');
   await sendPushToAllSubscribers({
@@ -225,7 +249,7 @@ cron.schedule('0 17 * * *', async () => {
     url: '/evening',
     tag: 'evening-azkar'
   });
-});
+}, CRON_CAIRO_TZ);
 
 // 3. جلب مواقيت الصلاة وفحصها في الخلفية
 let todayPrayerTimings = null;
@@ -244,19 +268,16 @@ async function refreshPrayerTimes() {
   }
 }
 
-// تحديث يومي عند 00:05 وعمل فحص عند إقلاع السيرفر
-cron.schedule('5 0 * * *', refreshPrayerTimes);
+// تحديث يومي عند 00:05 بتوقيت القاهرة وعمل فحص عند إقلاع السيرفر
+cron.schedule('5 0 * * *', refreshPrayerTimes, CRON_CAIRO_TZ);
 refreshPrayerTimes();
 
 // فحص كل دقيقة لمطابقة توقيت الصلوات الخمس
 cron.schedule('* * * * *', async () => {
   if (!todayPrayerTimings) return;
-  const now = new Date();
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const currentHM = `${hours}:${minutes}`;
 
-  if (lastNotifiedMinute === currentHM) return;
+  const currentHM = getCairoTimeHM();
+  if (!currentHM || lastNotifiedMinute === currentHM) return;
 
   const prayersMap = {
     Fajr: 'الفجر',
@@ -267,7 +288,11 @@ cron.schedule('* * * * *', async () => {
   };
 
   for (const [key, name] of Object.entries(prayersMap)) {
-    if (todayPrayerTimings[key] && todayPrayerTimings[key].slice(0, 5) === currentHM) {
+    const rawTime = todayPrayerTimings[key];
+    if (!rawTime) continue;
+
+    const cleanPrayerTime = extractHHMM(rawTime);
+    if (cleanPrayerTime === currentHM) {
       lastNotifiedMinute = currentHM;
       console.log(`[Prayer Scheduler] إرسال تنبيه أذان صلاة ${name} عبر Web Push...`);
       await sendPushToAllSubscribers({
@@ -279,7 +304,7 @@ cron.schedule('* * * * *', async () => {
       break;
     }
   }
-});
+}, CRON_CAIRO_TZ);
 
 // Start Server
 app.listen(PORT, () => {
