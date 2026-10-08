@@ -13,7 +13,8 @@
   - **التنسيق:** **Vanilla CSS** حديث ومتجاوب مع متغيرات ألوان وخطوط عربية مخصصة (Cairo & Amiri) ودعم كامل لاتجاه RTL.
   - **الإشعارات المتقدمة:** **Web Push API** باستخدام مكتبة `web-push`، مع **Service Worker** (`sw.js`) وتشفير **VAPID Keys** لإرسال التنبيهات في الخلفية.
   - **مواقيت الصلاة:** **Aladhan API** لحساب أوقات الصلوات بالمدينة أو بالإحداثيات الجغرافية المباشرة (Geolocation).
-  - **البيانات:** ملفات JSON مهيكلة ونظيفة بدون تعقيدات قواعد البيانات في هذه المرحلة (`azkar.json` و `subscriptions.json`).
+  - **قاعدة البيانات:** **MongoDB** مع **Mongoose** لتخزين اشتراكات Push وحل مشكلة Render Ephemeral Storage.
+  - **البيانات:** أذكار الصباح والمساء في `azkar.json` واشتراكات المستخدمين في MongoDB عبر نموذج `data/Subscription.js`.
 
 ---
 
@@ -21,14 +22,16 @@
 
 ```text
 zakker/
-├── app.js                   # ملف السيرفر الرئيسي والمسارات وإعدادات Web Push
+├── app.js                   # ملف السيرفر الرئيسي والمسارات والاتصال بـ MongoDB
 ├── package.json             # تعريف الحزم، والسكربتات (start, dev)
-├── .env                     # المتغيرات البيئية ومفاتيح VAPID والمنفذ
+├── .env                     # المتغيرات البيئية ومفاتيح VAPID ورابط MONGO_URI
 ├── .gitignore               # استثناء node_modules وملف .env
 ├── AGENTS.md                # هذا الملف المرجعي
-├── data/                    # البيانات المخزنة
-│   ├── azkar.json           # أذكار الصباح والمساء كاملة مع التشكيل والفضائل
-│   └── subscriptions.json   # اشتراكات الأجهزة المستقبلة لإشعارات Push
+├── data/                    # نماذج البيانات والملفات
+│   ├── Subscription.js      # موديل Mongoose لتخزين اشتراكات Web Push
+│   └── azkar.json           # أذكار الصباح والمساء كاملة مع التشكيل والفضائل
+├── services/                # الخدمات المنطقية
+│   └── notificationService.js # خدمة إرسال الإشعارات عبر MongoDB وحذف الاشتراكات التالفة
 ├── views/                   # قوالب EJS
 │   ├── index.ejs            # الصفحة الرئيسية (نظرة عامة والصلوات القادمة)
 │   ├── morning.ejs          # صفحة أذكار الصباح مع عدادات تفاعلية
@@ -58,7 +61,8 @@ zakker/
 | `/prayers` | `GET` | صفحة مواقيت الصلاة | رندر `views/prayers.ejs` |
 | `/api/azkar` | `GET` | جلب بيانات الأذكار كاملة كـ JSON | كائن JSON يحتوي أذكار الصباح والمساء |
 | `/api/vapid-public-key` | `GET` | إرسال المفتاح العام للمتصفح لتشفير الاشتراك | `{ publicKey: "..." }` |
-| `/api/subscribe` | `POST` | حفظ اشتراك جهاز المستخدم لاستقبال الـ Push | حفظ في `subscriptions.json` وإرجاع 201 |
+| `/api/save-subscription` | `POST` | حفظ/تحديث اشتراك الجهاز في MongoDB (Upsert) | حفظ في MongoDB وإرجاع 201 |
+| `/api/subscribe` | `POST` | مسار بديل متوافق لحفظ الاشتراك | حفظ في MongoDB وإرجاع 201 |
 
 ---
 

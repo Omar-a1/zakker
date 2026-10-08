@@ -1,6 +1,7 @@
 /**
  * Service Worker لمشروع ذكّر
- * يستقبل الإشعارات عبر خادم الـ Web Push حتى لو كان المتصفح مغلقاً أو في الخلفية
+ * مصمم ليكون ملفاً ثابتاً (Static) متوافقاً مع بيئات الاستضافة السحابية مثل Render (Ephemeral File System)
+ * يستقبل الإشعارات عبر خادم الـ Web Push حتى لو كان المتصفح مغلقاً تماماً أو في الخلفية
  */
 
 self.addEventListener('push', function(event) {
@@ -39,16 +40,20 @@ self.addEventListener('push', function(event) {
 
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
-  const targetUrl = (event.notification.data && event.notification.data.url) ? event.notification.data.url : '/';
+  const targetUrl = (event.notification.data && event.notification.data.url) 
+    ? event.notification.data.url 
+    : '/';
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+      // إذا كانت النافذة مفتوحة بالفعل، نركّز عليها
       for (let i = 0; i < clientList.length; i++) {
         let client = clientList[i];
         if (client.url.includes(targetUrl) && 'focus' in client) {
           return client.focus();
         }
       }
+      // إذا لم تكن مفتوحة، نفتح نافذة جديدة
       if (clients.openWindow) {
         return clients.openWindow(targetUrl);
       }

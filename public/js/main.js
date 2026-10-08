@@ -52,7 +52,7 @@ async function registerServiceWorker() {
       // التحقق إذا كان المستخدم مشتركاً بالفعل ومزامنة اشتراكه مع السيرفر
       const existingSub = await swRegistration.pushManager.getSubscription();
       if (existingSub) {
-        fetch('/api/subscribe', {
+        fetch('/api/save-subscription', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(existingSub)
@@ -79,7 +79,7 @@ async function subscribeUserToPush() {
     });
 
     // 3. إرسال الاشتراك وحفظه في السيرفر ليعمل في الخلفية
-    await fetch('/api/subscribe', {
+    await fetch('/api/save-subscription', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(subscription)

@@ -1,14 +1,36 @@
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
+const mongoose = require('mongoose');
 const webpush = require('web-push');
 const cron = require('node-cron');
 require('dotenv').config();
 
+const Subscription = require('./data/Subscription');
+const { sendNotificationToAll } = require('./services/notificationService');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Configure Web Push with VAPID keys
+// ====================================================
+// الاتصال بقاعدة بيانات MongoDB (Mongoose)
+// ====================================================
+const MONGO_URI = process.env.MONGO_URI || process.env.DATA_BASE;
+
+if (MONGO_URI) {
+  mongoose.connect(MONGO_URI)
+    .then(() => {
+      console.log('✅ تم الاتصال بقاعدة بيانات MongoDB بنجاح.');
+    })
+    .catch((err) => {
+      console.error('❌ خطأ في الاتصال بقاعدة بيانات MongoDB:', err.message);
+    });
+} else {
+  console.warn('⚠️ تحذير: لم يتم تعيين MONGO_URI أو DATA_BASE في ملف .env');
+}
+
+// ====================================================
+// إعداد مفاتيح Web Push (VAPID)
+// ====================================================
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
     process.env.VAPID_EMAIL || 'mailto:zakker-app@example.com',
@@ -17,70 +39,9 @@ if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   );
 }
 
-// Subscriptions storage helper
-const DATA_DIR = path.join(__dirname, 'data');
-const SUBSCRIPTIONS_FILE = path.join(DATA_DIR, 'subscriptions.json');
-
-function getSubscriptions() {
-  try {
-    if (fs.existsSync(SUBSCRIPTIONS_FILE)) {
-      const content = fs.readFileSync(SUBSCRIPTIONS_FILE, 'utf-8');
-      return JSON.parse(content || '[]');
-    }
-  } catch (err) {
-    console.error('خطأ في قراءة ملف الاشتراكات:', err);
-  }
-  return [];
-}
-
-function saveSubscriptions(subs) {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(SUBSCRIPTIONS_FILE, JSON.stringify(subs, null, 2));
-  } catch (err) {
-    console.error('خطأ في حفظ الاشتراكات:', err);
-  }
-}
-
-// دالة إرسال إشعار Push موحدة لجميع الأجهزة المشتركة
-async function sendPushToAllSubscribers(notificationData) {
-  const subs = getSubscriptions();
-  if (!subs.length) return { sent: 0, total: 0 };
-
-  const payload = JSON.stringify({
-    title: notificationData.title || 'تطبيق ذكّر 🕌',
-    body: notificationData.body || 'حان وقت الذكر والصلاة، ألا بذكر الله تطمئن القلوب.',
-    url: notificationData.url || '/',
-    tag: notificationData.tag || 'zakker-notification'
-  });
-
-  let successful = 0;
-  const remainingSubs = [];
-
-  for (const sub of subs) {
-    try {
-      await webpush.sendNotification(sub, payload);
-      successful++;
-      remainingSubs.push(sub);
-    } catch (err) {
-      console.warn('تعذر إرسال الإشعار لمشترك:', err.statusCode);
-      // حذف الاشتراكات غير الصالحة المنتهية (404 أو 410)
-      if (err.statusCode !== 404 && err.statusCode !== 410) {
-        remainingSubs.push(sub);
-      }
-    }
-  }
-
-  if (remainingSubs.length !== subs.length) {
-    saveSubscriptions(remainingSubs);
-  }
-
-  return { sent: successful, total: subs.length };
-}
-
+// ====================================================
 // Middleware
+// ====================================================
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -92,8 +53,10 @@ app.set('views', path.join(__dirname, 'views'));
 // Azkar Data
 const azkarData = require('./data/azkar.json');
 
-// Routes
-// 1. Home
+// ====================================================
+// مسارات الصفحات الأساسية (Routes)
+// ====================================================
+// 1. الصفحة الرئيسية
 app.get('/', (req, res) => {
   res.render('index', { 
     pageTitle: 'ذكّر - أذكار الصباح والمساء ومواقيت الصلاة',
@@ -101,7 +64,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// 2. Morning Azkar
+// 2. أذكار الصباح
 app.get('/morning', (req, res) => {
   res.render('morning', { 
     pageTitle: 'أذكار الصباح',
@@ -110,7 +73,7 @@ app.get('/morning', (req, res) => {
   });
 });
 
-// 3. Evening Azkar
+// 3. أذكار المساء
 app.get('/evening', (req, res) => {
   res.render('evening', { 
     pageTitle: 'أذكار المساء',
@@ -119,7 +82,7 @@ app.get('/evening', (req, res) => {
   });
 });
 
-// 4. Prayer Times
+// 4. مواقيت الصلاة
 app.get('/prayers', (req, res) => {
   res.render('prayers', { 
     pageTitle: 'مواقيت الصلاة',
@@ -127,12 +90,12 @@ app.get('/prayers', (req, res) => {
   });
 });
 
-// 5. API endpoint to get Azkar JSON
+// 5. مسار بيانات الأذكار كـ JSON
 app.get('/api/azkar', (req, res) => {
   res.json(azkarData);
 });
 
-// 5.1 API proxy for Prayer Times with server-side cache/fallback
+// 5.1 وكيل لجلب مواقيت الصلاة مع تخزين احتياطي في السيرفر
 app.get('/api/prayers', async (req, res) => {
   const city = req.query.city || 'Cairo';
   const country = req.query.country || 'Egypt';
@@ -158,28 +121,48 @@ app.get('/api/prayers', async (req, res) => {
   res.status(500).json({ error: 'تعذر جلب مواقيت الصلاة' });
 });
 
-// 6. Web Push: Get Public VAPID Key
+// ====================================================
+// مسارات Web Push API
+// ====================================================
+
+// 6. استرجاع المفتاح العام VAPID Public Key للمتصفح
 app.get('/api/vapid-public-key', (req, res) => {
   res.json({ publicKey: process.env.VAPID_PUBLIC_KEY || '' });
 });
 
-// 7. Web Push: Subscribe device
-app.post('/api/subscribe', (req, res) => {
-  const subscription = req.body;
-  if (!subscription || !subscription.endpoint) {
-    return res.status(400).json({ error: 'بيانات الاشتراك غير صحيحة' });
+// 7. حفظ / تحديث اشتراك المستخدم في MongoDB (Upsert)
+const handleSaveSubscription = async (req, res) => {
+  try {
+    const subscription = req.body;
+    if (!subscription || !subscription.endpoint || !subscription.keys) {
+      return res.status(400).json({ error: 'بيانات الاشتراك غير صحيحة أو غير مكتملة' });
+    }
+
+    // حفظ أو تحديث الاشتراك بناءً على رابط الـ endpoint
+    await Subscription.findOneAndUpdate(
+      { endpoint: subscription.endpoint },
+      {
+        endpoint: subscription.endpoint,
+        expirationTime: subscription.expirationTime || null,
+        keys: {
+          p256dh: subscription.keys.p256dh,
+          auth: subscription.keys.auth
+        }
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    return res.status(201).json({ 
+      message: 'تم حفظ الاشتراك بنجاح في قاعدة البيانات وتفعيل إشعارات الخلفية عبر Web Push' 
+    });
+  } catch (err) {
+    console.error('خطأ في حفظ الاشتراك في MongoDB:', err);
+    return res.status(500).json({ error: 'حدث خطأ أثناء حفظ الاشتراك في الخادم' });
   }
+};
 
-  const subs = getSubscriptions();
-  const exists = subs.some(s => s.endpoint === subscription.endpoint);
-  if (!exists) {
-    subs.push(subscription);
-    saveSubscriptions(subs);
-  }
-
-  res.status(201).json({ message: 'تم الاشتراك بنجاح وتفعيل إشعارات الخلفية عبر Web Push' });
-});
-
+app.post('/api/save-subscription', handleSaveSubscription);
+app.post('/api/subscribe', handleSaveSubscription); // مسار بديل للتوافقية
 
 // ====================================================
 // نظام جدولة التنبيهات في الخلفية عبر السيرفر (Node-Cron)
@@ -207,23 +190,31 @@ const CRON_CAIRO_TZ = { timezone: 'Africa/Cairo' };
 // 1. تنبيه أذكار الصباح يومياً الساعة 06:30 صباحاً (توقيت القاهرة)
 cron.schedule('30 6 * * *', async () => {
   console.log('[Cron] إرسال تنبيه أذكار الصباح في الخلفية لجميع المشتركين...');
-  await sendPushToAllSubscribers({
-    title: 'أذكار الصباح 🌅',
-    body: 'حان الآن وقت أذكار الصباح، ابدأ يومك بذكر الله وحصّن نفسك طوال النهار.',
-    url: '/morning',
-    tag: 'morning-azkar'
-  });
+  try {
+    await sendNotificationToAll({
+      title: 'أذكار الصباح 🌅',
+      body: 'حان الآن وقت أذكار الصباح، ابدأ يومك بذكر الله وحصّن نفسك طوال النهار.',
+      url: '/morning',
+      tag: 'morning-azkar'
+    });
+  } catch (err) {
+    console.error('[Cron] فشل في إرسال أذكار الصباح:', err.message);
+  }
 }, CRON_CAIRO_TZ);
 
-// 2. تنبيه أذكار المساء يومياً الساعة 17:00 (5:00 عصراً/مساءً بتوقيت القاهرة)
+// 2. تنبيه أذكار المساء يومياً الساعة 17:00 (5:00 مساءً بتوقيت القاهرة)
 cron.schedule('0 17 * * *', async () => {
   console.log('[Cron] إرسال تنبيه أذكار المساء في الخلفية لجميع المشتركين...');
-  await sendPushToAllSubscribers({
-    title: 'أذكار المساء 🌇',
-    body: 'حان الآن وقت أذكار المساء، ألا بذكر الله تطمئن القلوب، حصّن نفسك حتى تصبح.',
-    url: '/evening',
-    tag: 'evening-azkar'
-  });
+  try {
+    await sendNotificationToAll({
+      title: 'أذكار المساء 🌇',
+      body: 'حان الآن وقت أذكار المساء، ألا بذكر الله تطمئن القلوب، حصّن نفسك حتى تصبح.',
+      url: '/evening',
+      tag: 'evening-azkar'
+    });
+  } catch (err) {
+    console.error('[Cron] فشل في إرسال أذكار المساء:', err.message);
+  }
 }, CRON_CAIRO_TZ);
 
 // 3. جلب مواقيت الصلاة وفحصها في الخلفية
@@ -270,18 +261,24 @@ cron.schedule('* * * * *', async () => {
     if (cleanPrayerTime === currentHM) {
       lastNotifiedMinute = currentHM;
       console.log(`[Prayer Scheduler] إرسال تنبيه أذان صلاة ${name} عبر Web Push...`);
-      await sendPushToAllSubscribers({
-        title: `حان الآن موعد أذان ${name} 🕌`,
-        body: `حي على الصلاة، حي على الفلاح. تذكير بموعد صلاة ${name}.`,
-        url: '/prayers',
-        tag: `prayer-${key}`
-      });
+      try {
+        await sendNotificationToAll({
+          title: `حان الآن موعد أذان ${name} 🕌`,
+          body: `حي على الصلاة، حي على الفلاح. تذكير بموعد صلاة ${name}.`,
+          url: '/prayers',
+          tag: `prayer-${key}`
+        });
+      } catch (err) {
+        console.error(`[Prayer Scheduler] فشل إرسال تنبيه صلاة ${name}:`, err.message);
+      }
       break;
     }
   }
 }, CRON_CAIRO_TZ);
 
-// Start Server
+// ====================================================
+// تشغيل السيرفر (Start Server)
+// ====================================================
 app.listen(PORT, () => {
   console.log(`Server is running at: http://localhost:${PORT}`);
 });
