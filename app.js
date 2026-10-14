@@ -40,11 +40,38 @@ if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
 }
 
 // ====================================================
+// إعدادات CORS ودعم الاتصال بين النطاقات (Cross-Origin)
+// ====================================================
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Origin, X-Requested-With, Content-Type, Accept, Authorization'
+  );
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  res.setHeader('Vary', 'Origin');
+
+  // الاستجابة الفورية لطلبات الفحص التمهيدي (Preflight)
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
+  next();
+});
+
 // Middleware
 // ====================================================
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// مسار فحص صحة الخادم وإبقائه نشطاً (Ping / Keep-Alive)
+app.get('/api/ping', (req, res) => {
+  res.status(200).json({ status: 'active', message: 'Zakker server is awake! 🟢', timestamp: new Date() });
+});
 
 // Template Engine (EJS)
 app.set('view engine', 'ejs');

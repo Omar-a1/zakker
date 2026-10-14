@@ -63,6 +63,7 @@ zakker/
 | `/api/vapid-public-key` | `GET` | إرسال المفتاح العام للمتصفح لتشفير الاشتراك | `{ publicKey: "..." }` |
 | `/api/save-subscription` | `POST` | حفظ/تحديث اشتراك الجهاز في MongoDB (Upsert) | حفظ في MongoDB وإرجاع 201 |
 | `/api/subscribe` | `POST` | مسار بديل متوافق لحفظ الاشتراك | حفظ في MongoDB وإرجاع 201 |
+| `/api/ping` | `GET` | فحص صحة السيرفر ومنع دخوله في وضع الخمول (Keep-Alive) | `{ status: "active", message: "..." }` |
 
 ---
 
