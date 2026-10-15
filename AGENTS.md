@@ -64,6 +64,8 @@ zakker/
 | `/api/save-subscription` | `POST` | حفظ/تحديث اشتراك الجهاز في MongoDB (Upsert) | حفظ في MongoDB وإرجاع 201 |
 | `/api/subscribe` | `POST` | مسار بديل متوافق لحفظ الاشتراك | حفظ في MongoDB وإرجاع 201 |
 | `/api/ping` | `GET` | فحص صحة السيرفر ومنع دخوله في وضع الخمول (Keep-Alive) | `{ status: "active", message: "..." }` |
+| `/api/send-notification` | `POST` | استقبال مهام وإشعارات Upstash QStash المؤمنة مع Retries | تنفيذ الإشعار أو إرجاع 500 لإعادة المحاولة |
+| `/api/qstash/init-schedules` | `POST` / `GET` | تهيئة وتسجيل جداول QStash الدورية تلقائياً | ملخص الجداول المسجلة كـ JSON |
 
 ---
 
@@ -83,6 +85,24 @@ zakker/
    - عندما يرسل السيرفر تنبيهاً عبر `webpush.sendNotification()`, تستقبله خدمة المتصفح في نظام التشغيل (FCM / Mozilla Push Service).
    - يقوم الـ Service Worker بالتقاط حدث `push` ويعرض الإشعار مباشرة مع دعم الاهتزاز والاتجاه العربي.
    - عند النقر على الإشعار (`notificationclick`)، يتم فتح نافذة الموقع تلقائياً.
+
+---
+
+### 4.1. حل مشكلة نوم السيرفر (Cold Start) عبر Upstash QStash
+
+لحل مشكلة نوم خوادم Vercel Serverless وضمان عدم ضياع التنبيهات:
+1. **الجدولة السحابية الموثوقة (Cloud Scheduling):**
+   - يتم تسجيل الجداول في خدمة **Upstash QStash** الخارجية لتعمل 24/7 دون الاعتماد على ذاكرة السيرفر.
+   - الجداول المعتمدة:
+     - أذكار الصباح: `CRON_TZ=Africa/Cairo 30 6 * * *` (الساعة 06:30 بتوقيت القاهرة).
+     - أذكار المساء: `CRON_TZ=Africa/Cairo 0 17 * * *` (الساعة 17:00 بتوقيت القاهرة).
+     - مجدول الصلوات اليومي: `CRON_TZ=Africa/Cairo 5 0 * * *` (يجدول 5 رسائل مؤجلة بـ Unix Timestamps للصلوات الخمس).
+2. **نظام إعادة المحاولة التلقائي (Automatic Retries):**
+   - عند إيقاظ السيرفر من وضع الخمول (Cold Start)، إذا حدث أي تأخير أو خطأ، يقوم QStash بإعادة إرسال الـ Webhook تلقائياً (بمعدل 3 محاولات مع Exponential Backoff) حتى يتلقى رمز `200 OK`.
+3. **أمان الـ Webhook وتوثيق التوقيع الرقمي:**
+   - تستقبل نقطة النهاية `/api/send-notification` الطلب وتقوم بفحص الترويسة `upstash-signature` بواسطة `Receiver` من حزمة `@upstash/qstash` لضمان عدم استدعائها إلا من QStash.
+4. **أدوات وسكربتات التشغيل:**
+   - سكربت المزامنة المباشر: `npm run setup:qstash` أو عبر المسار `/api/qstash/init-schedules`.
 
 ---
 

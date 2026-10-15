@@ -1,5 +1,21 @@
+const mongoose = require('mongoose');
 const webpush = require('web-push');
 const Subscription = require('../data/Subscription');
+
+// التأكد من اتصال قاعدة البيانات عند حدوث Vercel Cold Start
+async function ensureDbConnected() {
+  if (mongoose.connection.readyState === 1) {
+    return;
+  }
+  const uri = process.env.MONGO_URI || process.env.DATA_BASE;
+  if (!uri) {
+    console.warn('⚠️ [NotificationService] لم يتم العثور على MONGO_URI للاتصال بقاعدة البيانات.');
+    return;
+  }
+  console.log('[NotificationService] إعادة الاتصال بقاعدة البيانات MongoDB (Cold Start)...');
+  await mongoose.connect(uri);
+  console.log('✅ [NotificationService] تم الاتصال بقاعدة البيانات بنجاح.');
+}
 
 // التأكد من تهيئة مفاتيح VAPID
 function ensureVapidConfig() {
@@ -21,6 +37,7 @@ function ensureVapidConfig() {
  * @param {object} [options] - خيارات إضافية (url, tag, icon, badge)
  */
 async function sendNotificationToAll(titleOrPayload, body = '', options = {}) {
+  await ensureDbConnected();
   ensureVapidConfig();
 
   // دعم تمرير كائن أو معاملات منفصلة
