@@ -1,130 +1,122 @@
-const mongoose = require('mongoose');
-const webpush = require('web-push');
+/**
+ * ==============================================================================
+ * 🚀 خدمة إرسال الإشعارات الشاملة في الخلفية (Notification Service)
+ * ==============================================================================
+ * تقوم هذه الخدمة بقراءة اشتراكات الأجهزة من قاعدة بيانات MongoDB وإرسال
+ * إشعارات الـ Web Push حتى لو كانت المتصفحات أو الأجهزة مغلقة.
+ * كما تقوم تلقائياً بحذف الاشتراكات التالفة أو التي ألغى أصحابها الصلاحية.
+ */
+
+const connectDB = require('../config/db');
+const { initWebPush, webpush } = require('../config/webpush');
 const Subscription = require('../data/Subscription');
 
-// التأكد من اتصال قاعدة البيانات عند حدوث Vercel Cold Start
-async function ensureDbConnected() {
-  if (mongoose.connection.readyState === 1) {
-    return;
-  }
-  const uri = process.env.MONGO_URI || process.env.DATA_BASE;
-  if (!uri) {
-    console.warn('⚠️ [NotificationService] لم يتم العثور على MONGO_URI للاتصال بقاعدة البيانات.');
-    return;
-  }
-  console.log('[NotificationService] إعادة الاتصال بقاعدة البيانات MongoDB (Cold Start)...');
-  await mongoose.connect(uri);
-  console.log('✅ [NotificationService] تم الاتصال بقاعدة البيانات بنجاح.');
-}
-
-// التأكد من تهيئة مفاتيح VAPID
-function ensureVapidConfig() {
-  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-    webpush.setVapidDetails(
-      process.env.VAPID_EMAIL || 'mailto:zakker-app@example.com',
-      process.env.VAPID_PUBLIC_KEY,
-      process.env.VAPID_PRIVATE_KEY
-    );
-  }
-}
-
 /**
- * إرسال إشعار Push لجميع المشتركين المخزنين في MongoDB
- * وحذف الاشتراكات المنتهية (404 / 410) تلقائياً
+ * إرسال إشعار Web Push لجميع الأجهزة المشتركة في MongoDB
  * 
- * @param {string|object} titleOrPayload - عنوان الإشعار أو كائن يحوي البيانات كاملة
- * @param {string} [body] - نص الإشعار
- * @param {object} [options] - خيارات إضافية (url, tag, icon, badge)
+ * @param {object|string} payloadOrTitle - كائن بيانات الإشعار أو عنوان التنبيه
+ * @param {string} [bodyText] - نص الرسالة في حال تم تمرير العنوان كنص
+ * @param {object} [extraOptions] - خيارات إضافية (url, tag, icon, badge)
+ * @returns {Promise<{ sent: number, failed: number, deleted: number, total: number }>}
  */
-async function sendNotificationToAll(titleOrPayload, body = '', options = {}) {
-  await ensureDbConnected();
-  ensureVapidConfig();
+async function sendNotificationToAll(payloadOrTitle, bodyText = '', extraOptions = {}) {
+  // 1. ضمان الاتصال بقاعدة بيانات MongoDB وتجهيز تشفير WebPush
+  await connectDB();
+  initWebPush();
 
-  // دعم تمرير كائن أو معاملات منفصلة
+  // 2. توحيد وتجهيز بيانات الإشعار (Payload)
   let title = 'تطبيق ذكّر 🕌';
-  let messageBody = body;
+  let body = bodyText;
   let url = '/';
   let tag = 'zakker-notification';
   let icon = '/img/icon.png';
   let badge = '/img/badge.png';
 
-  if (typeof titleOrPayload === 'object' && titleOrPayload !== null) {
-    title = titleOrPayload.title || title;
-    messageBody = titleOrPayload.body || messageBody;
-    url = titleOrPayload.url || url;
-    tag = titleOrPayload.tag || tag;
-    icon = titleOrPayload.icon || icon;
-    badge = titleOrPayload.badge || badge;
-  } else if (typeof titleOrPayload === 'string') {
-    title = titleOrPayload;
-    if (options.url) url = options.url;
-    if (options.tag) tag = options.tag;
-    if (options.icon) icon = options.icon;
-    if (options.badge) badge = options.badge;
+  if (typeof payloadOrTitle === 'object' && payloadOrTitle !== null) {
+    title = payloadOrTitle.title || title;
+    body = payloadOrTitle.body || body;
+    url = payloadOrTitle.url || url;
+    tag = payloadOrTitle.tag || tag;
+    icon = payloadOrTitle.icon || icon;
+    badge = payloadOrTitle.badge || badge;
+  } else if (typeof payloadOrTitle === 'string') {
+    title = payloadOrTitle;
+    if (extraOptions.url) url = extraOptions.url;
+    if (extraOptions.tag) tag = extraOptions.tag;
+    if (extraOptions.icon) icon = extraOptions.icon;
+    if (extraOptions.badge) badge = extraOptions.badge;
   }
 
-  const payload = JSON.stringify({
+  const notificationPayload = JSON.stringify({
     title,
-    body: messageBody,
+    body,
     url,
     tag,
     icon,
     badge
   });
 
-  try {
-    const subscriptions = await Subscription.find({});
-    if (!subscriptions || subscriptions.length === 0) {
-      console.log('[NotificationService] لا توجد اشتراكات مسجلة حالياً في قاعدة البيانات.');
-      return { sent: 0, failed: 0, deleted: 0, total: 0 };
-    }
+  // 3. جلب جميع الاشتراكات المسجلة من MongoDB
+  const subscriptions = await Subscription.find({}).lean();
 
-    let sentCount = 0;
-    let failedCount = 0;
-    let deletedCount = 0;
-
-    const pushPromises = subscriptions.map(async (sub) => {
-      const pushConfig = {
-        endpoint: sub.endpoint,
-        keys: {
-          p256dh: sub.keys.p256dh,
-          auth: sub.keys.auth
-        }
-      };
-
-      try {
-        await webpush.sendNotification(pushConfig, payload);
-        sentCount++;
-      } catch (err) {
-        failedCount++;
-        // إذا كان الخطأ 404 أو 410، فهذا يعني أن الجهاز ألغى الاشتراك أو انتهت صلاحيته
-        if (err.statusCode === 404 || err.statusCode === 410) {
-          console.warn(`[NotificationService] اشتراك غير صالح (${err.statusCode}). جارٍ حذفه من MongoDB: ${sub.endpoint.slice(0, 35)}...`);
-          try {
-            await Subscription.deleteOne({ _id: sub._id });
-            deletedCount++;
-          } catch (deleteErr) {
-            console.error('[NotificationService] فشل حذف الاشتراك التالف:', deleteErr.message);
-          }
-        } else {
-          console.warn(`[NotificationService] تعذر الإرسال للمشترك (رمز الخطأ: ${err.statusCode || 'N/A'}): ${err.message}`);
-        }
-      }
-    });
-
-    await Promise.allSettled(pushPromises);
-
-    console.log(`[NotificationService] اكتمل إرسال الإشعارات: نجح ${sentCount} | فشل ${failedCount} | حُذف ${deletedCount} من إجمالي ${subscriptions.length}`);
-    return {
-      sent: sentCount,
-      failed: failedCount,
-      deleted: deletedCount,
-      total: subscriptions.length
-    };
-  } catch (error) {
-    console.error('[NotificationService] خطأ أثناء استرجاع الاشتراكات من MongoDB:', error);
-    throw error;
+  if (!subscriptions || subscriptions.length === 0) {
+    console.log('ℹ️ [NotificationService] لا توجد اشتراكات مسجلة حالياً في قاعدة البيانات.');
+    return { sent: 0, failed: 0, deleted: 0, total: 0 };
   }
+
+  console.log(`📤 [NotificationService] بدء إرسال إشعار "${title}" إلى ${subscriptions.length} جهاز...`);
+
+  let sentCount = 0;
+  let failedCount = 0;
+  const invalidSubscriptionIds = [];
+
+  // 4. إرسال الإشعارات بالتوازي لسرعة الأداء
+  const sendTasks = subscriptions.map(async (sub) => {
+    const pushConfig = {
+      endpoint: sub.endpoint,
+      keys: {
+        p256dh: sub.keys?.p256dh,
+        auth: sub.keys?.auth
+      }
+    };
+
+    try {
+      await webpush.sendNotification(pushConfig, notificationPayload);
+      sentCount++;
+    } catch (err) {
+      failedCount++;
+      // إذا كان كود الخطأ 404 أو 410، فهذا يعني أن المستخدم ألغى إذن الإشعارات أو غير جهازه
+      if (err.statusCode === 404 || err.statusCode === 410) {
+        invalidSubscriptionIds.push(sub._id);
+      } else {
+        console.warn(`⚠️ [NotificationService] تعذر الإرسال لجهاز (كود ${err.statusCode || 'غير محدد'}): ${err.message}`);
+      }
+    }
+  });
+
+  await Promise.allSettled(sendTasks);
+
+  // 5. تنظيف الاشتراكات المنتهية من قاعدة البيانات دفعة واحدة (Bulk Delete)
+  let deletedCount = 0;
+  if (invalidSubscriptionIds.length > 0) {
+    try {
+      const deleteResult = await Subscription.deleteMany({ _id: { $in: invalidSubscriptionIds } });
+      deletedCount = deleteResult.deletedCount || 0;
+      console.log(`🧹 [NotificationService] تم تنظيف وحذف ${deletedCount} اشتراك ملغي/منتهي من MongoDB.`);
+    } catch (cleanErr) {
+      console.error('❌ [NotificationService] خطأ أثناء حذف الاشتراكات التالفة:', cleanErr.message);
+    }
+  }
+
+  const summary = {
+    sent: sentCount,
+    failed: failedCount,
+    deleted: deletedCount,
+    total: subscriptions.length
+  };
+
+  console.log(`✅ [NotificationService] تم الانتهاء: نجاح (${sentCount}) | فشل (${failedCount}) | منتهية ومحذوفة (${deletedCount}) من إجمالي (${subscriptions.length})`);
+  return summary;
 }
 
 module.exports = {

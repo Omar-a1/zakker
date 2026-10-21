@@ -22,16 +22,21 @@
 
 ```text
 zakker/
-├── app.js                   # ملف السيرفر الرئيسي والمسارات والاتصال بـ MongoDB
+├── app.js                   # ملف السيرفر الرئيسي والمسارات
 ├── package.json             # تعريف الحزم، والسكربتات (start, dev)
 ├── .env                     # المتغيرات البيئية ومفاتيح VAPID ورابط MONGO_URI
+├── .env.example             # قالب المتغيرات البيئية للمشروع
 ├── .gitignore               # استثناء node_modules وملف .env
 ├── AGENTS.md                # هذا الملف المرجعي
+├── config/                  # الإعدادات الموحدة
+│   ├── db.js                # وحدة الاتصال المركزية بـ MongoDB مع كاش Serverless
+│   └── webpush.js           # إعداد وتهيئة مفاتيح تشفير Web Push (VAPID)
 ├── data/                    # نماذج البيانات والملفات
-│   ├── Subscription.js      # موديل Mongoose لتخزين اشتراكات Web Push
+│   ├── Subscription.js      # موديل Mongoose لتخزين اشتراكات Web Push في MongoDB
 │   └── azkar.json           # أذكار الصباح والمساء كاملة مع التشكيل والفضائل
 ├── services/                # الخدمات المنطقية
-│   └── notificationService.js # خدمة إرسال الإشعارات عبر MongoDB وحذف الاشتراكات التالفة
+│   ├── notificationService.js # خدمة إرسال الإشعارات عبر MongoDB وحذف الاشتراكات التالفة
+│   └── qstashService.js     # خدمة التحقق وجدولة مهام QStash مع Retries
 ├── views/                   # قوالب EJS
 │   ├── index.ejs            # الصفحة الرئيسية (نظرة عامة والصلوات القادمة)
 │   ├── morning.ejs          # صفحة أذكار الصباح مع عدادات تفاعلية
@@ -80,7 +85,7 @@ zakker/
 3. **الاشتراك (Subscription Flow):**
    - عندما يضغط المستخدم على "تفعيل التنبيهات"، يجلب المتصفح الـ Public Key من السيرفر.
    - يطلب المتصفح إذن المستخدم، ثم ينشئ نقطة اشتراك فريدة عبر `pushManager.subscribe`.
-   - يتم إرسال كائن الاشتراك إلى المسار `POST /api/subscribe` ويتم حفظه في [`data/subscriptions.json`](file:///c:/Users/iamio/OneDrive/المستندات/zakker/data/subscriptions.json).
+   - يتم إرسال كائن الاشتراك إلى المسار `POST /api/save-subscription` ويتم حفظه دائماً في قاعدة بيانات MongoDB عبر الموديل `Subscription.js`.
 4. **استقبال الإشعار (`sw.js`):**
    - عندما يرسل السيرفر تنبيهاً عبر `webpush.sendNotification()`, تستقبله خدمة المتصفح في نظام التشغيل (FCM / Mozilla Push Service).
    - يقوم الـ Service Worker بالتقاط حدث `push` ويعرض الإشعار مباشرة مع دعم الاهتزاز والاتجاه العربي.
