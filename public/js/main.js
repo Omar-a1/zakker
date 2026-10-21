@@ -49,14 +49,23 @@ async function registerServiceWorker() {
       swRegistration = await navigator.serviceWorker.register('/sw.js');
       console.log('تم تسجيل Service Worker بنجاح.');
       
-      // التحقق إذا كان المستخدم مشتركاً بالفعل ومزامنة اشتراكه مع السيرفر
-      const existingSub = await swRegistration.pushManager.getSubscription();
+      // انتظار جاهزية السيرفس ووركر
+      const readyReg = await navigator.serviceWorker.ready;
+      swRegistration = readyReg;
+
+      // فحص إذا كان الجهاز مسجلاً في PushManager
+      const existingSub = await readyReg.pushManager.getSubscription();
       if (existingSub) {
-        fetch('/api/save-subscription', {
+        console.log('تم العثور على اشتراك موجود، جارٍ مزامنته مع MongoDB...');
+        await fetch('/api/save-subscription', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(existingSub)
         }).catch(() => {});
+      } else if (Notification.permission === 'granted') {
+        // الإذن ممنوح ولكن لم ينشأ اشتراك Push بعد (مثلاً بعد عمل Reset Permissions)
+        console.log('الإذن ممنوح، جارٍ إنشاء اشتراك Push وحفظه في MongoDB...');
+        await subscribeUserToPush();
       }
       updateNotificationButtonUI();
     } catch (error) {
@@ -67,27 +76,39 @@ async function registerServiceWorker() {
 
 async function subscribeUserToPush() {
   try {
+    const reg = swRegistration || (await navigator.serviceWorker.ready);
+    if (!reg) {
+      console.warn('Service Worker غير متوفر حالياً.');
+      return false;
+    }
+
     // 1. جلب المفتاح العام من السيرفر
     const response = await fetch('/api/vapid-public-key');
     const { publicKey } = await response.json();
-    if (!publicKey) return;
+    if (!publicKey) {
+      console.warn('لم يتم العثور على VAPID Public Key.');
+      return false;
+    }
 
     // 2. طلب الاشتراك من الـ PushManager
-    const subscription = await swRegistration.pushManager.subscribe({
+    const subscription = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(publicKey)
     });
 
-    // 3. إرسال الاشتراك وحفظه في السيرفر ليعمل في الخلفية
-    await fetch('/api/save-subscription', {
+    // 3. إرسال الاشتراك وحفظه في MongoDB
+    const saveRes = await fetch('/api/save-subscription', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(subscription)
     });
 
-    console.log('تم تسجيل الاشتراك في إشعارات الخلفية بنجاح.');
+    const resJson = await saveRes.json();
+    console.log('✅ تم حفظ الاشتراك في MongoDB بنجاح:', resJson);
+    return true;
   } catch (err) {
     console.error('فشل الاشتراك في Web Push:', err);
+    return false;
   }
 }
 
@@ -196,6 +217,27 @@ function initNotifications() {
   const activeCloseBtn = document.getElementById('notifyActiveCloseBtn');
   const blockedCloseBtn = document.getElementById('notifyBlockedCloseBtn');
   const reloadBtn = document.getElementById('notifyReloadBtn');
+  const resyncBtn = document.getElementById('notifyResyncBtn');
+
+  if (resyncBtn) {
+    resyncBtn.addEventListener('click', async () => {
+      resyncBtn.disabled = true;
+      resyncBtn.textContent = 'جارٍ المزامنة مع قاعدة البيانات... ⏳';
+      const success = await subscribeUserToPush();
+      if (success) {
+        resyncBtn.textContent = 'تم حفظ الاشتراك بنجاح! ✓';
+        showNotification('تطبيق ذكّر 🕌', 'تم تأكيد تسجيل اشتراك جهازك في قاعدة البيانات بنجاح!');
+        setTimeout(() => {
+          closeNotificationModal();
+          resyncBtn.disabled = false;
+          resyncBtn.textContent = 'تأكيد وتحديث اشتراك جهازي الآن 🔄';
+        }, 1200);
+      } else {
+        resyncBtn.textContent = 'فشلت المزامنة، حاول مرة أخرى ⚠️';
+        resyncBtn.disabled = false;
+      }
+    });
+  }
 
   if (closeBtn) closeBtn.addEventListener('click', closeNotificationModal);
   if (softCancelBtn) softCancelBtn.addEventListener('click', closeNotificationModal);
