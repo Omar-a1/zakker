@@ -1,0 +1,28 @@
+{
+  "name": "ذكّر - أذكار الصباح والمساء ومواقيت الصلاة",
+  "short_name": "ذكّر",
+  "description": "تطبيق وموقع إسلامي شامل لأذكار الصباح والمساء ومواقيت الصلاة مع نظام إشعارات ذكي يعمل في الخلفية وبدون إنترنت.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f766e",
+  "lang": "ar",
+  "dir": "rtl",
+  "categories": ["lifestyle", "utilities", "education"],
+  "icons": [
+    {
+      "src": "/zakker logo-modified.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/zakker-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

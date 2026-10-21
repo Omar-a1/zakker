@@ -82,7 +82,15 @@ app.use(express.json({
   }
 }));
 
-// تقديم الملفات الثابتة (CSS, JS, الصور)
+// ترويسة خاصة بـ Service Worker للسماح بالنطاق الكامل /
+app.use((req, res, next) => {
+  if (req.url === '/sw.js') {
+    res.setHeader('Service-Worker-Allowed', '/');
+  }
+  next();
+});
+
+// تقديم الملفات الثابتة (CSS, JS, الصور، manifest)
 app.use(express.static(path.join(__dirname, 'public')));
 
 // إعداد محرك القوالب EJS
