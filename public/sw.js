@@ -4,6 +4,14 @@
  * يستقبل الإشعارات عبر خادم الـ Web Push حتى لو كان المتصفح مغلقاً تماماً أو في الخلفية
  */
 
+self.addEventListener('install', function(event) {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', function(event) {
+  event.waitUntil(clients.claim());
+});
+
 self.addEventListener('push', function(event) {
   let notificationData = {};
 

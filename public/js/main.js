@@ -76,27 +76,43 @@ async function registerServiceWorker() {
 
 async function subscribeUserToPush() {
   try {
+    if (!window.isSecureContext) {
+      throw new Error('بيئة غير آمنة (يجب استخدام localhost أو HTTPS)');
+    }
+
     const reg = swRegistration || (await navigator.serviceWorker.ready);
     if (!reg) {
-      console.warn('Service Worker غير متوفر حالياً.');
-      return false;
+      throw new Error('Service Worker غير جاهز في المتصفح');
     }
 
     // 1. جلب المفتاح العام من السيرفر
     const response = await fetch('/api/vapid-public-key');
+    if (!response.ok) {
+      throw new Error(`تعذر جلب VAPID Key من السيرفر (${response.status})`);
+    }
     const { publicKey } = await response.json();
     if (!publicKey) {
-      console.warn('لم يتم العثور على VAPID Public Key.');
-      return false;
+      throw new Error('مفتاح VAPID العام غير موجود في .env');
     }
 
-    // 2. طلب الاشتراك من الـ PushManager
+    // 2. التحقق من وجود اشتراك قديم في المتصفح وإلغاؤه لتفادي تعارض المفاتيح القديمة
+    const existingSub = await reg.pushManager.getSubscription();
+    if (existingSub) {
+      try {
+        console.log('إلغاء الاشتراك القديم لتجديده بمفاتيح VAPID الجديدة...');
+        await existingSub.unsubscribe();
+      } catch (unsubErr) {
+        console.warn('تعذر إلغاء الاشتراك السابق:', unsubErr);
+      }
+    }
+
+    // 3. طلب اشتراك Push جديد تماماً
     const subscription = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(publicKey)
     });
 
-    // 3. إرسال الاشتراك وحفظه في MongoDB
+    // 4. إرسال الاشتراك وحفظه في MongoDB
     const saveRes = await fetch('/api/save-subscription', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -104,11 +120,15 @@ async function subscribeUserToPush() {
     });
 
     const resJson = await saveRes.json();
+    if (!saveRes.ok) {
+      throw new Error(resJson.error || `فشل السيرفر في الحفظ (كود ${saveRes.status})`);
+    }
+
     console.log('✅ تم حفظ الاشتراك في MongoDB بنجاح:', resJson);
-    return true;
+    return { success: true };
   } catch (err) {
-    console.error('فشل الاشتراك في Web Push:', err);
-    return false;
+    console.error('❌ فشل الاشتراك في Web Push:', err);
+    return { success: false, error: err.message || String(err) };
   }
 }
 
@@ -223,17 +243,18 @@ function initNotifications() {
     resyncBtn.addEventListener('click', async () => {
       resyncBtn.disabled = true;
       resyncBtn.textContent = 'جارٍ المزامنة مع قاعدة البيانات... ⏳';
-      const success = await subscribeUserToPush();
-      if (success) {
-        resyncBtn.textContent = 'تم حفظ الاشتراك بنجاح! ✓';
+      const result = await subscribeUserToPush();
+      if (result.success) {
+        resyncBtn.textContent = 'تم حفظ الاشتراك في MongoDB بنجاح! ✓';
         showNotification('تطبيق ذكّر 🕌', 'تم تأكيد تسجيل اشتراك جهازك في قاعدة البيانات بنجاح!');
         setTimeout(() => {
           closeNotificationModal();
           resyncBtn.disabled = false;
           resyncBtn.textContent = 'تأكيد وتحديث اشتراك جهازي الآن 🔄';
-        }, 1200);
+        }, 1500);
       } else {
-        resyncBtn.textContent = 'فشلت المزامنة، حاول مرة أخرى ⚠️';
+        resyncBtn.textContent = `فشل: ${result.error} ⚠️`;
+        console.error('خطأ مزامنة الاشتراك:', result.error);
         resyncBtn.disabled = false;
       }
     });
