@@ -329,6 +329,26 @@ const handleInitSchedules = async (req, res) => {
 app.post('/api/qstash/init-schedules', handleInitSchedules);
 app.get('/api/qstash/init-schedules', handleInitSchedules);
 
+// مسار لجدولة مواقيت الصلاة فوراً في QStash
+const handleSchedulePrayers = async (req, res) => {
+  try {
+    const hostUrl = `${req.protocol}://${req.get('host')}`;
+    const targetUrl = process.env.APP_URL || hostUrl;
+    const result = await scheduleDailyPrayersWithQStash(targetUrl);
+    return res.json({
+      success: true,
+      message: 'تمت جدولة مواقيت الصلاة في QStash بنجاح.',
+      result
+    });
+  } catch (err) {
+    console.error('❌ [QStash Prayers] خطأ أثناء جدولة الصلوات:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+app.post('/api/qstash/schedule-prayers', handleSchedulePrayers);
+app.get('/api/qstash/schedule-prayers', handleSchedulePrayers);
+
 // ==============================================================================
 // ⏱️ الجدولة الداخلية بالسيرفر (Node-Cron للخوادم الدائمة)
 // ==============================================================================

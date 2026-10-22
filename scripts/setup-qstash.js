@@ -1,5 +1,9 @@
 require('dotenv').config();
-const { initQStashSchedules, getQStashClient } = require('../services/qstashService');
+const {
+  initQStashSchedules,
+  getQStashClient,
+  scheduleDailyPrayersWithQStash
+} = require('../services/qstashService');
 
 async function main() {
   console.log('====================================================');
@@ -39,6 +43,11 @@ async function main() {
         }))
       );
     }
+
+    // جدولة صلوات اليوم والغد فوراً
+    console.log('\n🕌 جارٍ جدولة مواقيت الصلوات الخمس في QStash...');
+    const prayerResults = await scheduleDailyPrayersWithQStash(appUrl);
+    console.log(`✅ تم تسجيل ${prayerResults.scheduledCount || 0} صلاة قادمة بنجاح.`);
 
     console.log('\n🎉 تمت تهيئة الجداول بنجاح! سيقوم QStash بإيقاظ السيرفر وإرسال الإشعارات مع Retries تلقائياً.');
   } catch (err) {

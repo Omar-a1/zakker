@@ -65,25 +65,21 @@ async function verifyQStashSignature(req) {
 }
 
 /**
- * حساب الطابع الزمني بالثواني (Unix Epoch) لتوقيت القاهرة مع دعم إزاحة الأيام
+ * حساب الطابع الزمني بالثواني (Unix Epoch) لتوقيت القاهرة
  * @param {string} hhmm - الوقت بصيغة HH:MM
- * @param {number} [dayOffset=0] - 0 لليوم الحالي، 1 للغد
  * @returns {number}
  */
-function getEpochSecondsForCairo(hhmm, dayOffset = 0) {
+function getEpochSecondsForCairo(hhmm, targetDate = new Date()) {
   const [h, m] = hhmm.split(':').map(Number);
-  const targetDate = new Date();
-  if (dayOffset !== 0) {
-    targetDate.setDate(targetDate.getDate() + dayOffset);
-  }
+  const now = targetDate;
 
-  // الحصول على التاريخ المطلوب بتوقيت القاهرة
+  // الحصول على تاريخ اليوم بتوقيت القاهرة
   const dParts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Africa/Cairo',
     year: 'numeric',
     month: 'numeric',
     day: 'numeric'
-  }).formatToParts(targetDate);
+  }).formatToParts(now);
 
   const parts = {};
   dParts.forEach((p) => { parts[p.type] = p.value; });
@@ -201,20 +197,6 @@ async function initQStashSchedules(appUrl) {
     }
   }
 
-  // جدولة صلوات اليوم/الغد فوراً دون انتظار موعد منتصف الليل
-  try {
-    console.log('🕌 [QStash Setup] جارِ جدولة الصلوات الخمس مباشرة في QStash...');
-    const prayerResults = await scheduleDailyPrayersWithQStash(baseUrl);
-    results.push({
-      name: 'immediate-prayers-schedule',
-      description: 'جدولة الصلوات الخمس القادمة',
-      status: 'created',
-      details: prayerResults
-    });
-  } catch (prayerErr) {
-    console.warn('⚠️ [QStash Setup] تعذر الجدولة الفورية للصلوات:', prayerErr.message);
-  }
-
   return results;
 }
 
@@ -265,50 +247,77 @@ async function scheduleDailyPrayersWithQStash(appUrl) {
 
   const currentEpochSeconds = Math.floor(Date.now() / 1000);
   const nowIsoDate = new Date().toISOString().slice(0, 10);
-  const scheduledPrayers = [];
+  let scheduledPrayers = [];
 
-  for (const prayer of prayersMap) {
-    const rawTime = timings[prayer.key];
-    if (!rawTime) continue;
+  // دالة مساعدة لجدولة مصفوفة صلوات ليوم معين
+  async function schedulePrayersForDay(dayTimings, targetDate, dateLabel) {
+    const results = [];
+    const isoDateStr = targetDate.toISOString().slice(0, 10);
 
-    const timeClean = rawTime.slice(0, 5);
-    let targetEpoch = getEpochSecondsForCairo(timeClean, 0);
-    let targetDateStr = nowIsoDate;
+    for (const prayer of prayersMap) {
+      const rawTime = dayTimings[prayer.key];
+      if (!rawTime) continue;
 
-    // إذا كانت صلاة اليوم قد انقضت، نجدول موعد صلاة الغد تلقائياً
-    if (targetEpoch <= currentEpochSeconds) {
-      targetEpoch = getEpochSecondsForCairo(timeClean, 1);
-      const tomorrowDate = new Date();
-      tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-      targetDateStr = tomorrowDate.toISOString().slice(0, 10);
+      const timeClean = rawTime.slice(0, 5);
+      const prayerEpoch = getEpochSecondsForCairo(timeClean, targetDate);
+
+      // التأكد من أن وقت الصلاة ما زال في المستقبل
+      if (prayerEpoch > currentEpochSeconds) {
+        const deduplicationId = `prayer-${prayer.key}-${isoDateStr}`;
+        try {
+          const msgRes = await client.publishJSON({
+            url: destination, // تم التصحيح: استخدام url بدلاً من destination المتوافقة مع publishJSON
+            body: {
+              type: 'prayer',
+              prayerKey: prayer.key,
+              prayerName: prayer.name,
+              prayerTime: timeClean
+            },
+            notBefore: prayerEpoch,
+            retries,
+            deduplicationId
+          });
+
+          results.push({
+            prayer: prayer.name,
+            time: timeClean,
+            epoch: prayerEpoch,
+            date: dateLabel,
+            messageId: msgRes.messageId
+          });
+          console.log(`🕌 [QStash Prayers] تمت جدولة أذان ${prayer.name} (${dateLabel}) للساعة ${timeClean} بتوقيت القاهرة (ID: ${msgRes.messageId})`);
+        } catch (err) {
+          console.error(`❌ [QStash Prayers] خطأ في جدولة ${prayer.name}:`, err.message);
+        }
+      } else {
+        console.log(`⏩ [QStash Prayers] صلاة ${prayer.name} (${timeClean} - ${dateLabel}) انقضت، تم تخطيها.`);
+      }
     }
+    return results;
+  }
 
-    const deduplicationId = `prayer-${prayer.key}-${targetDateStr}`;
+  // 1. محاولة جدولة صلوات اليوم المتبقية
+  const todayDate = new Date();
+  scheduledPrayers = await schedulePrayersForDay(timings, todayDate, 'اليوم');
+
+  // 2. إذا كانت جميع صلوات اليوم قد انقضت (مثلاً في المساء بعد العشاء)، نقوم بجدولة صلوات الغد فوراً!
+  if (scheduledPrayers.length === 0) {
+    console.log('🌙 [QStash Prayers] انقضت جميع صلوات اليوم، جاري جلب وجدولة صلوات الغد...');
     try {
-      // استخدام url بدلاً من destination المطلوب لمكتبة QStash في دالة publishJSON
-      const msgRes = await client.publishJSON({
-        url: destination,
-        body: {
-          type: 'prayer',
-          prayerKey: prayer.key,
-          prayerName: prayer.name,
-          prayerTime: timeClean
-        },
-        notBefore: targetEpoch,
-        retries,
-        deduplicationId
-      });
+      const tomorrowDate = new Date(Date.now() + 24 * 3600 * 1000);
+      const d = String(tomorrowDate.getDate()).padStart(2, '0');
+      const m = String(tomorrowDate.getMonth() + 1).padStart(2, '0');
+      const y = tomorrowDate.getFullYear();
+      const dateStr = `${d}-${m}-${y}`;
 
-      scheduledPrayers.push({
-        prayer: prayer.name,
-        time: timeClean,
-        epoch: targetEpoch,
-        date: targetDateStr,
-        messageId: msgRes.messageId
-      });
-      console.log(`🕌 [QStash Prayers] تمت جدولة أذان ${prayer.name} (${targetDateStr} الساعة ${timeClean} بتوقيت القاهرة) بنجاح: ID ${msgRes.messageId}`);
-    } catch (err) {
-      console.error(`❌ [QStash Prayers] خطأ في جدولة ${prayer.name}:`, err.message);
+      const resTomorrow = await fetch(`https://api.aladhan.com/v1/timingsByCity/${dateStr}?city=Cairo&country=Egypt&method=5`);
+      const jsonTomorrow = await resTomorrow.json();
+      if (jsonTomorrow.code === 200 && jsonTomorrow.data) {
+        const tomorrowResults = await schedulePrayersForDay(jsonTomorrow.data.timings, tomorrowDate, 'الغد');
+        scheduledPrayers = scheduledPrayers.concat(tomorrowResults);
+      }
+    } catch (tomErr) {
+      console.error('❌ [QStash Prayers] فشل جلب مواقيت الغد:', tomErr.message);
     }
   }
 
@@ -330,7 +339,7 @@ async function publishNotificationTask({ destinationUrl, payload, delaySeconds =
   const destination = destinationUrl || `${(process.env.APP_URL || '').replace(/\/$/, '')}/api/send-notification`;
 
   const options = {
-    url: destination,
+    url: destination, // استخدام url متوافق مع QStash SDK
     body: payload,
     retries: Number(retries || 3),
   };
