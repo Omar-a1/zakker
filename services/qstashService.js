@@ -65,21 +65,25 @@ async function verifyQStashSignature(req) {
 }
 
 /**
- * حساب الطابع الزمني بالثواني (Unix Epoch) لتوقيت القاهرة
+ * حساب الطابع الزمني بالثواني (Unix Epoch) لتوقيت القاهرة مع دعم إزاحة الأيام
  * @param {string} hhmm - الوقت بصيغة HH:MM
+ * @param {number} [dayOffset=0] - 0 لليوم الحالي، 1 للغد
  * @returns {number}
  */
-function getEpochSecondsForCairo(hhmm) {
+function getEpochSecondsForCairo(hhmm, dayOffset = 0) {
   const [h, m] = hhmm.split(':').map(Number);
-  const now = new Date();
+  const targetDate = new Date();
+  if (dayOffset !== 0) {
+    targetDate.setDate(targetDate.getDate() + dayOffset);
+  }
 
-  // الحصول على تاريخ اليوم بتوقيت القاهرة
+  // الحصول على التاريخ المطلوب بتوقيت القاهرة
   const dParts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Africa/Cairo',
     year: 'numeric',
     month: 'numeric',
     day: 'numeric'
-  }).formatToParts(now);
+  }).formatToParts(targetDate);
 
   const parts = {};
   dParts.forEach((p) => { parts[p.type] = p.value; });
@@ -197,6 +201,20 @@ async function initQStashSchedules(appUrl) {
     }
   }
 
+  // جدولة صلوات اليوم/الغد فوراً دون انتظار موعد منتصف الليل
+  try {
+    console.log('🕌 [QStash Setup] جارِ جدولة الصلوات الخمس مباشرة في QStash...');
+    const prayerResults = await scheduleDailyPrayersWithQStash(baseUrl);
+    results.push({
+      name: 'immediate-prayers-schedule',
+      description: 'جدولة الصلوات الخمس القادمة',
+      status: 'created',
+      details: prayerResults
+    });
+  } catch (prayerErr) {
+    console.warn('⚠️ [QStash Setup] تعذر الجدولة الفورية للصلوات:', prayerErr.message);
+  }
+
   return results;
 }
 
@@ -254,37 +272,43 @@ async function scheduleDailyPrayersWithQStash(appUrl) {
     if (!rawTime) continue;
 
     const timeClean = rawTime.slice(0, 5);
-    const prayerEpoch = getEpochSecondsForCairo(timeClean);
+    let targetEpoch = getEpochSecondsForCairo(timeClean, 0);
+    let targetDateStr = nowIsoDate;
 
-    // إذا كان وقت الصلاة ما زال في المستقبل لهذا اليوم
-    if (prayerEpoch > currentEpochSeconds) {
-      const deduplicationId = `prayer-${prayer.key}-${nowIsoDate}`;
-      try {
-        const msgRes = await client.publishJSON({
-          destination,
-          body: {
-            type: 'prayer',
-            prayerKey: prayer.key,
-            prayerName: prayer.name,
-            prayerTime: timeClean
-          },
-          notBefore: prayerEpoch,
-          retries,
-          deduplicationId
-        });
+    // إذا كانت صلاة اليوم قد انقضت، نجدول موعد صلاة الغد تلقائياً
+    if (targetEpoch <= currentEpochSeconds) {
+      targetEpoch = getEpochSecondsForCairo(timeClean, 1);
+      const tomorrowDate = new Date();
+      tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+      targetDateStr = tomorrowDate.toISOString().slice(0, 10);
+    }
 
-        scheduledPrayers.push({
-          prayer: prayer.name,
-          time: timeClean,
-          epoch: prayerEpoch,
-          messageId: msgRes.messageId
-        });
-        console.log(`🕌 [QStash Prayers] تمت جدولة أذان ${prayer.name} للساعة ${timeClean} بتوقيت القاهرة (ID: ${msgRes.messageId})`);
-      } catch (err) {
-        console.error(`❌ [QStash Prayers] خطأ في جدولة ${prayer.name}:`, err.message);
-      }
-    } else {
-      console.log(`⏩ [QStash Prayers] صلاة ${prayer.name} (${timeClean}) انقضت اليوم، تم تخطيها.`);
+    const deduplicationId = `prayer-${prayer.key}-${targetDateStr}`;
+    try {
+      // استخدام url بدلاً من destination المطلوب لمكتبة QStash في دالة publishJSON
+      const msgRes = await client.publishJSON({
+        url: destination,
+        body: {
+          type: 'prayer',
+          prayerKey: prayer.key,
+          prayerName: prayer.name,
+          prayerTime: timeClean
+        },
+        notBefore: targetEpoch,
+        retries,
+        deduplicationId
+      });
+
+      scheduledPrayers.push({
+        prayer: prayer.name,
+        time: timeClean,
+        epoch: targetEpoch,
+        date: targetDateStr,
+        messageId: msgRes.messageId
+      });
+      console.log(`🕌 [QStash Prayers] تمت جدولة أذان ${prayer.name} (${targetDateStr} الساعة ${timeClean} بتوقيت القاهرة) بنجاح: ID ${msgRes.messageId}`);
+    } catch (err) {
+      console.error(`❌ [QStash Prayers] خطأ في جدولة ${prayer.name}:`, err.message);
     }
   }
 
@@ -306,7 +330,7 @@ async function publishNotificationTask({ destinationUrl, payload, delaySeconds =
   const destination = destinationUrl || `${(process.env.APP_URL || '').replace(/\/$/, '')}/api/send-notification`;
 
   const options = {
-    destination,
+    url: destination,
     body: payload,
     retries: Number(retries || 3),
   };
