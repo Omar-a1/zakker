@@ -8,8 +8,8 @@
  * 3. فحص وجدولة الإشعارات المحلية أوفلاين عبر IndexedDB.
  */
 
-const STATIC_CACHE_NAME = 'zakker-static-v3';
-const DYNAMIC_CACHE_NAME = 'zakker-dynamic-v3';
+const STATIC_CACHE_NAME = 'zakker-static-v4';
+const DYNAMIC_CACHE_NAME = 'zakker-dynamic-v4';
 
 // الملفات الثابتة والصفحات الأساسية التي يتم تخزينها فور تثبيت التطبيق للعمل بدون إنترنت
 const PRECACHE_ASSETS = [
