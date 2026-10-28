@@ -1,0 +1,54 @@
+<%- include('partials/header') %>
+<%- include('partials/navbar') %>
+
+<main class="container page-content">
+  <div class="page-header">
+    <h1>أذكار دخول وخروج الخلاء 🚪</h1>
+    <p>السنة النبوية للاستعاذة من الخبث والخبائث عند الدخول، وسؤال المغفرة عند الخروج</p>
+
+    <!-- شريط التحكم بحجم الخط لجميع الأذكار -->
+    <div class="font-controls-bar">
+      <span class="font-controls-label">حجم الخط:</span>
+      <div class="font-btn-group">
+        <button type="button" id="font-plus" class="btn-font" title="تكبير الخط">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span>تكبير</span>
+        </button>
+        <button type="button" id="font-reset" class="btn-font" title="استعادة الحجم الافتراضي">
+          <span>افتراضي</span>
+        </button>
+        <button type="button" id="font-minus" class="btn-font" title="تصغير الخط">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span>تصغير</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="azkar-list">
+    <% azkar.forEach(function(item) { %>
+      <article class="zekr-card" id="zekr-restroom-<%= item.id %>">
+        <div class="zekr-body">
+          <% if (item.name) { %>
+            <div class="zekr-header-meta">
+              <h3 class="zekr-title"><%= item.name %></h3>
+              <% if (item.category) { %><span class="zekr-badge"><%= item.category %></span><% } %>
+            </div>
+          <% } %>
+          <p class="zekr-text"><%= item.text %></p>
+          <% if (item.virtue) { %>
+            <div class="zekr-fadl"><%= item.virtue %></div>
+          <% } %>
+        </div>
+        <div class="zekr-footer">
+          <span class="zekr-target">التكرار: <strong><%= item.count %></strong></span>
+          <button class="zekr-counter-btn" data-target="<%= item.count %>" data-current="0">
+            <span class="count-num">0</span> / <%= item.count %>
+          </button>
+        </div>
+      </article>
+    <% }); %>
+  </div>
+</main>
+
+<%- include('partials/footer') %>

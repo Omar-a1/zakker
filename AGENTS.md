@@ -63,8 +63,14 @@ zakker/
 | `/` | `GET` | الصفحة الرئيسية | رندر `views/index.ejs` |
 | `/morning` | `GET` | صفحة أذكار الصباح | رندر `views/morning.ejs` مع مصفوفة الأذكار |
 | `/evening` | `GET` | صفحة أذكار المساء | رندر `views/evening.ejs` مع مصفوفة الأذكار |
+| `/sleep` | `GET` | صفحة أذكار النوم | رندر `views/sleep.ejs` مع مصفوفة الأذكار |
+| `/waking` | `GET` | صفحة أذكار الاستيقاظ | رندر `views/waking.ejs` مع مصفوفة الأذكار |
+| `/home-azkar` | `GET` | صفحة أذكار المنزل | رندر `views/home_azkar.ejs` مع مصفوفة الأذكار |
+| `/restroom` | `GET` | صفحة أذكار الخلاء | رندر `views/restroom.ejs` مع مصفوفة الأذكار |
+| `/wudu` | `GET` | صفحة أذكار الوضوء | رندر `views/wudu.ejs` مع مصفوفة الأذكار |
+| `/daily` | `GET` | صفحة أذكار المسلم اليومية الشاملة | رندر `views/daily.ejs` مع تبويبات وأقسام الأذكار |
 | `/prayers` | `GET` | صفحة مواقيت الصلاة | رندر `views/prayers.ejs` |
-| `/api/azkar` | `GET` | جلب بيانات الأذكار كاملة كـ JSON | كائن JSON يحتوي أذكار الصباح والمساء |
+| `/api/azkar` | `GET` | جلب بيانات الأذكار كاملة كـ JSON | كائن JSON يحتوي كافة تصنيفات الأذكار |
 | `/api/vapid-public-key` | `GET` | إرسال المفتاح العام للمتصفح لتشفير الاشتراك | `{ publicKey: "..." }` |
 | `/api/save-subscription` | `POST` | حفظ/تحديث اشتراك الجهاز في MongoDB (Upsert) | حفظ في MongoDB وإرجاع 201 |
 | `/api/subscribe` | `POST` | مسار بديل متوافق لحفظ الاشتراك | حفظ في MongoDB وإرجاع 201 |

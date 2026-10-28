@@ -127,6 +127,66 @@ app.get('/evening', (req, res) => {
   });
 });
 
+// صفحة أذكار النوم
+app.get('/sleep', (req, res) => {
+  res.render('sleep', { 
+    pageTitle: 'أذكار النوم',
+    currentPage: 'sleep',
+    azkar: azkarData.sleep || []
+  });
+});
+
+// صفحة أذكار الاستيقاظ من النوم
+app.get('/waking', (req, res) => {
+  res.render('waking', { 
+    pageTitle: 'أذكار الاستيقاظ من النوم',
+    currentPage: 'waking',
+    azkar: azkarData.waking || []
+  });
+});
+
+// صفحة أذكار دخول وخروج المنزل
+app.get('/home-azkar', (req, res) => {
+  res.render('home_azkar', { 
+    pageTitle: 'أذكار دخول وخروج المنزل',
+    currentPage: 'home-azkar',
+    azkar: azkarData.home || []
+  });
+});
+
+// صفحة أذكار دخول وخروج الخلاء
+app.get('/restroom', (req, res) => {
+  res.render('restroom', { 
+    pageTitle: 'أذكار دخول وخروج الخلاء',
+    currentPage: 'restroom',
+    azkar: azkarData.restroom || []
+  });
+});
+
+// صفحة أذكار الوضوء
+app.get('/wudu', (req, res) => {
+  res.render('wudu', { 
+    pageTitle: 'أذكار الوضوء',
+    currentPage: 'wudu',
+    azkar: azkarData.wudu || []
+  });
+});
+
+// صفحة أذكار المسلم اليومية الشاملة
+app.get('/daily', (req, res) => {
+  res.render('daily', { 
+    pageTitle: 'أذكار المسلم اليومية',
+    currentPage: 'daily',
+    azkar: {
+      waking: azkarData.waking || [],
+      sleep: azkarData.sleep || [],
+      home: azkarData.home || [],
+      restroom: azkarData.restroom || [],
+      wudu: azkarData.wudu || []
+    }
+  });
+});
+
 // صفحة مواقيت الصلاة
 app.get('/prayers', (req, res) => {
   res.render('prayers', { 

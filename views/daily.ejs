@@ -1,0 +1,206 @@
+<%- include('partials/header') %>
+<%- include('partials/navbar') %>
+
+<main class="container page-content">
+  <div class="page-header">
+    <h1>أذكار المسلم اليومية 📿</h1>
+    <p>مجموعة الأذكار النبوية الثابتة في سائر أحوال اليوم والليلة: النوم واليقظة والمنزل والخلاء والوضوء</p>
+
+    <!-- شريط التحكم بحجم الخط -->
+    <div class="font-controls-bar">
+      <span class="font-controls-label">حجم الخط:</span>
+      <div class="font-btn-group">
+        <button type="button" id="font-plus" class="btn-font" title="تكبير الخط">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span>تكبير</span>
+        </button>
+        <button type="button" id="font-reset" class="btn-font" title="استعادة الحجم الافتراضي">
+          <span>افتراضي</span>
+        </button>
+        <button type="button" id="font-minus" class="btn-font" title="تصغير الخط">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span>تصغير</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- أزرار التصفية السريعة بين الأقسام -->
+    <div class="category-tabs-bar" role="tablist">
+      <button type="button" class="category-tab active" data-category="all">الكل</button>
+      <a href="/waking" class="category-tab">أذكار الاستيقاظ ☀️</a>
+      <a href="/sleep" class="category-tab">أذكار النوم 🌙</a>
+      <a href="/home-azkar" class="category-tab">أذكار المنزل 🏡</a>
+      <a href="/restroom" class="category-tab">أذكار الخلاء 🚪</a>
+      <a href="/wudu" class="category-tab">أذكار الوضوء 💧</a>
+    </div>
+  </div>
+
+  <div class="daily-sections-wrapper">
+    <!-- 1. أذكار الاستيقاظ -->
+    <section class="daily-category-section" id="section-waking">
+      <div class="daily-category-header">
+        <div class="daily-cat-title-group">
+          <span class="daily-cat-icon">☀️</span>
+          <h2>أذكار الاستيقاظ من النوم</h2>
+        </div>
+        <a href="/waking" class="daily-cat-link">صفحة منفصلة ←</a>
+      </div>
+      <div class="azkar-list">
+        <% azkar.waking.forEach(function(item) { %>
+          <article class="zekr-card" id="zekr-daily-waking-<%= item.id %>">
+            <div class="zekr-body">
+              <% if (item.name) { %>
+                <div class="zekr-header-meta">
+                  <h3 class="zekr-title"><%= item.name %></h3>
+                  <span class="zekr-badge"><%= item.category %></span>
+                </div>
+              <% } %>
+              <p class="zekr-text"><%= item.text %></p>
+              <% if (item.virtue) { %><div class="zekr-fadl"><%= item.virtue %></div><% } %>
+            </div>
+            <div class="zekr-footer">
+              <span class="zekr-target">التكرار: <strong><%= item.count %></strong></span>
+              <button class="zekr-counter-btn" data-target="<%= item.count %>" data-current="0">
+                <span class="count-num">0</span> / <%= item.count %>
+              </button>
+            </div>
+          </article>
+        <% }); %>
+      </div>
+    </section>
+
+    <!-- 2. أذكار النوم -->
+    <section class="daily-category-section" id="section-sleep">
+      <div class="daily-category-header">
+        <div class="daily-cat-title-group">
+          <span class="daily-cat-icon">🌙</span>
+          <h2>أذكار النوم</h2>
+        </div>
+        <a href="/sleep" class="daily-cat-link">صفحة منفصلة ←</a>
+      </div>
+      <div class="azkar-list">
+        <% azkar.sleep.forEach(function(item) { %>
+          <article class="zekr-card" id="zekr-daily-sleep-<%= item.id %>">
+            <div class="zekr-body">
+              <% if (item.name) { %>
+                <div class="zekr-header-meta">
+                  <h3 class="zekr-title"><%= item.name %></h3>
+                  <span class="zekr-badge"><%= item.category %></span>
+                </div>
+              <% } %>
+              <p class="zekr-text"><%= item.text %></p>
+              <% if (item.virtue) { %><div class="zekr-fadl"><%= item.virtue %></div><% } %>
+            </div>
+            <div class="zekr-footer">
+              <span class="zekr-target">التكرار: <strong><%= item.count %></strong></span>
+              <button class="zekr-counter-btn" data-target="<%= item.count %>" data-current="0">
+                <span class="count-num">0</span> / <%= item.count %>
+              </button>
+            </div>
+          </article>
+        <% }); %>
+      </div>
+    </section>
+
+    <!-- 3. أذكار المنزل -->
+    <section class="daily-category-section" id="section-home">
+      <div class="daily-category-header">
+        <div class="daily-cat-title-group">
+          <span class="daily-cat-icon">🏡</span>
+          <h2>أذكار دخول وخروج المنزل</h2>
+        </div>
+        <a href="/home-azkar" class="daily-cat-link">صفحة منفصلة ←</a>
+      </div>
+      <div class="azkar-list">
+        <% azkar.home.forEach(function(item) { %>
+          <article class="zekr-card" id="zekr-daily-home-<%= item.id %>">
+            <div class="zekr-body">
+              <% if (item.name) { %>
+                <div class="zekr-header-meta">
+                  <h3 class="zekr-title"><%= item.name %></h3>
+                  <span class="zekr-badge"><%= item.category %></span>
+                </div>
+              <% } %>
+              <p class="zekr-text"><%= item.text %></p>
+              <% if (item.virtue) { %><div class="zekr-fadl"><%= item.virtue %></div><% } %>
+            </div>
+            <div class="zekr-footer">
+              <span class="zekr-target">التكرار: <strong><%= item.count %></strong></span>
+              <button class="zekr-counter-btn" data-target="<%= item.count %>" data-current="0">
+                <span class="count-num">0</span> / <%= item.count %>
+              </button>
+            </div>
+          </article>
+        <% }); %>
+      </div>
+    </section>
+
+    <!-- 4. أذكار الخلاء -->
+    <section class="daily-category-section" id="section-restroom">
+      <div class="daily-category-header">
+        <div class="daily-cat-title-group">
+          <span class="daily-cat-icon">🚪</span>
+          <h2>أذكار دخول وخروج الخلاء</h2>
+        </div>
+        <a href="/restroom" class="daily-cat-link">صفحة منفصلة ←</a>
+      </div>
+      <div class="azkar-list">
+        <% azkar.restroom.forEach(function(item) { %>
+          <article class="zekr-card" id="zekr-daily-restroom-<%= item.id %>">
+            <div class="zekr-body">
+              <% if (item.name) { %>
+                <div class="zekr-header-meta">
+                  <h3 class="zekr-title"><%= item.name %></h3>
+                  <span class="zekr-badge"><%= item.category %></span>
+                </div>
+              <% } %>
+              <p class="zekr-text"><%= item.text %></p>
+              <% if (item.virtue) { %><div class="zekr-fadl"><%= item.virtue %></div><% } %>
+            </div>
+            <div class="zekr-footer">
+              <span class="zekr-target">التكرار: <strong><%= item.count %></strong></span>
+              <button class="zekr-counter-btn" data-target="<%= item.count %>" data-current="0">
+                <span class="count-num">0</span> / <%= item.count %>
+              </button>
+            </div>
+          </article>
+        <% }); %>
+      </div>
+    </section>
+
+    <!-- 5. أذكار الوضوء -->
+    <section class="daily-category-section" id="section-wudu">
+      <div class="daily-category-header">
+        <div class="daily-cat-title-group">
+          <span class="daily-cat-icon">💧</span>
+          <h2>أذكار الوضوء</h2>
+        </div>
+        <a href="/wudu" class="daily-cat-link">صفحة منفصلة ←</a>
+      </div>
+      <div class="azkar-list">
+        <% azkar.wudu.forEach(function(item) { %>
+          <article class="zekr-card" id="zekr-daily-wudu-<%= item.id %>">
+            <div class="zekr-body">
+              <% if (item.name) { %>
+                <div class="zekr-header-meta">
+                  <h3 class="zekr-title"><%= item.name %></h3>
+                  <span class="zekr-badge"><%= item.category %></span>
+                </div>
+              <% } %>
+              <p class="zekr-text"><%= item.text %></p>
+              <% if (item.virtue) { %><div class="zekr-fadl"><%= item.virtue %></div><% } %>
+            </div>
+            <div class="zekr-footer">
+              <span class="zekr-target">التكرار: <strong><%= item.count %></strong></span>
+              <button class="zekr-counter-btn" data-target="<%= item.count %>" data-current="0">
+                <span class="count-num">0</span> / <%= item.count %>
+              </button>
+            </div>
+          </article>
+        <% }); %>
+      </div>
+    </section>
+  </div>
+</main>
+
+<%- include('partials/footer') %>

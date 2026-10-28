@@ -469,7 +469,7 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
 /* ==================================================== */
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 1.5rem;
   margin-bottom: 2.5rem;
 }
@@ -1139,3 +1139,95 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
     transform: scale(1);
   }
 }
+
+/* ==================================================== */
+/* Daily Azkar Page & Tabs Styling */
+/* ==================================================== */
+.category-tabs-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+  margin-top: 1.25rem;
+  padding: 0.25rem 0;
+}
+
+.category-tab {
+  background: var(--card-bg);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 0.45rem 1.1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.category-tab:hover {
+  color: var(--primary-color);
+  border-color: var(--primary-light);
+  transform: translateY(-1px);
+}
+
+.category-tab.active {
+  background: var(--primary-color);
+  color: #ffffff;
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 6px rgba(15, 118, 110, 0.25);
+}
+
+.daily-sections-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+  margin-bottom: 3rem;
+}
+
+.daily-category-section {
+  scroll-margin-top: 90px;
+}
+
+.daily-category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.daily-cat-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.daily-cat-icon {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.daily-category-header h2 {
+  font-size: 1.35rem;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.daily-cat-link {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--primary-color);
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+}
+
+.daily-cat-link:hover {
+  text-decoration: underline;
+  opacity: 0.85;
+}
+
