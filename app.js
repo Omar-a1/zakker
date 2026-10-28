@@ -172,11 +172,11 @@ app.get('/wudu', (req, res) => {
   });
 });
 
-// صفحة أذكار المسلم اليومية الشاملة
-app.get('/daily', (req, res) => {
-  res.render('daily', { 
-    pageTitle: 'أذكار المسلم اليومية',
-    currentPage: 'daily',
+// صفحة جميع الأذكار (تضم الأذكار الإضافية كاملة في صفحة واحدة)
+app.get(['/azkar', '/daily'], (req, res) => {
+  res.render('azkar', { 
+    pageTitle: 'جميع الأذكار - ذكّر',
+    currentPage: 'azkar',
     azkar: {
       waking: azkarData.waking || [],
       sleep: azkarData.sleep || [],

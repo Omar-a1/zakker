@@ -530,6 +530,103 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
 }
 
 /* ==================================================== */
+/* Card Full Width (جميع الأذكار - Width 100%) */
+/* ==================================================== */
+.card-full-width {
+  grid-column: 1 / -1;
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  text-align: right;
+  padding: 2rem 2.25rem;
+  gap: 1.75rem;
+  background: linear-gradient(135deg, var(--card-bg) 0%, rgba(15, 118, 110, 0.06) 100%);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.card-full-width:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary-light);
+}
+
+.card-full-content {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex: 1;
+}
+
+.card-full-content .card-icon {
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius);
+  background: rgba(15, 118, 110, 0.1);
+  color: var(--primary-color);
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .card-full-content .card-icon {
+  background: rgba(20, 184, 166, 0.15);
+  color: var(--primary-light);
+}
+
+.card-full-text {
+  text-align: right;
+}
+
+.card-full-text h2 {
+  font-size: 1.5rem;
+  margin-bottom: 0.35rem;
+  color: var(--text-main);
+}
+
+.card-full-text p {
+  margin-bottom: 0;
+  color: var(--text-muted);
+  font-size: 0.98rem;
+  line-height: 1.6;
+}
+
+.card-full-btn {
+  white-space: nowrap;
+  padding: 0.75rem 1.75rem;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .card-full-width {
+    flex-direction: column;
+    text-align: center;
+    padding: 1.75rem 1.25rem;
+  }
+  .card-full-content {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+  .card-full-text {
+    text-align: center;
+  }
+  .card-full-text p {
+    margin-bottom: 1.25rem;
+  }
+  .card-full-btn {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+/* ==================================================== */
 /* Azkar List & Cards */
 /* ==================================================== */
 .azkar-list {
