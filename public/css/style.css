@@ -903,10 +903,6 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
   .mobile-nav-bar {
     display: block;
   }
-  /* إخفاء خانة جميع الأذكار من شريط الموبايل السفلي */
-  .mobile-nav-links a #all-azkar {
-    display: none !important;
-  }
   .cards-grid {
     grid-template-columns: 1fr;
   }
