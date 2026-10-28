@@ -904,7 +904,7 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
     display: block;
   }
   /* إخفاء خانة جميع الأذكار من شريط الموبايل السفلي */
-  .mobile-nav-links a[href*="/azkar"]:not(.active) {
+  .mobile-nav-links a #all-azkar {
     display: none !important;
   }
   .cards-grid {
