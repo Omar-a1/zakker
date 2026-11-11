@@ -1,6 +1,143 @@
 <%- include('partials/header') %>
 <%- include('partials/navbar') %>
 
+<!-- تضمين أنماط التنقل السريع والشريط المثبت لضمان الاستجابة السلسة والفورية -->
+<style>
+  html {
+    scroll-behavior: smooth;
+  }
+  .daily-category-section {
+    scroll-margin-top: 135px !important;
+  }
+  .azkar-nav-wrapper {
+    position: sticky !important;
+    top: 56px !important;
+    z-index: 45 !important;
+    background: var(--bg-color, #f8fafc) !important;
+    padding: 0.55rem 0 !important;
+    margin: 1rem 0 1.5rem !important;
+    width: 100% !important;
+    border-bottom: 1px solid var(--border-color, #e2e8f0) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    transition: background-color 0.25s ease, border-color 0.25s ease !important;
+  }
+  [data-theme="dark"] .azkar-nav-wrapper {
+    background: rgba(9, 13, 22, 0.94) !important;
+    border-bottom: 1px solid rgba(31, 41, 61, 0.8) !important;
+  }
+  .category-tabs-bar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-wrap: wrap !important;
+    gap: 0.65rem !important;
+    padding: 0.3rem 0.2rem !important;
+    margin: 0 auto !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+  }
+  .category-tabs-bar::-webkit-scrollbar {
+    display: none !important;
+  }
+  .category-tab {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    padding: 0.52rem 1.15rem !important;
+    background: var(--card-bg, #ffffff) !important;
+    color: var(--text-main, #1e293b) !important;
+    border: 1.5px solid var(--border-color, #e2e8f0) !important;
+    border-radius: 999px !important;
+    font-family: 'Cairo', sans-serif !important;
+    font-size: 0.92rem !important;
+    font-weight: 700 !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04) !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    user-select: none !important;
+    white-space: nowrap !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+  .category-tab:visited,
+  .category-tab:link {
+    color: var(--text-main, #1e293b) !important;
+    text-decoration: none !important;
+  }
+  .category-tab:hover {
+    color: var(--primary-color, #0f766e) !important;
+    border-color: var(--primary-light, #14b8a6) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(15, 118, 110, 0.15) !important;
+  }
+  .category-tab.active {
+    background: var(--primary-color, #0f766e) !important;
+    color: #ffffff !important;
+    border-color: var(--primary-color, #0f766e) !important;
+    box-shadow: 0 4px 14px rgba(15, 118, 110, 0.35) !important;
+    transform: translateY(-1px) !important;
+  }
+  .category-tab.active:visited,
+  .category-tab.active:link {
+    color: #ffffff !important;
+  }
+  .category-tab.active .category-tab-badge {
+    background: rgba(255, 255, 255, 0.25) !important;
+    color: #ffffff !important;
+    border-color: transparent !important;
+  }
+  .category-tab-icon {
+    font-size: 1.15rem !important;
+    line-height: 1 !important;
+  }
+  .category-tab-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 22px !important;
+    height: 22px !important;
+    padding: 0 6px !important;
+    border-radius: 999px !important;
+    font-size: 0.78rem !important;
+    font-weight: 800 !important;
+    background: var(--bg-color, #f8fafc) !important;
+    color: var(--text-muted, #64748b) !important;
+    border: 1px solid var(--border-color, #e2e8f0) !important;
+    transition: all 0.2s ease !important;
+  }
+  .font-controls-bar {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0.75rem !important;
+    background: var(--card-bg, #ffffff) !important;
+    border: 1px solid var(--border-color, #e2e8f0) !important;
+    padding: 0.35rem 1rem !important;
+    border-radius: 999px !important;
+    margin: 0.75rem auto 0 !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03) !important;
+  }
+  .font-controls-label {
+    font-size: 0.88rem !important;
+    font-weight: 700 !important;
+    color: var(--text-muted, #64748b) !important;
+  }
+  @media (max-width: 768px) {
+    .category-tabs-bar {
+      justify-content: flex-start !important;
+      flex-wrap: nowrap !important;
+      padding: 0.35rem 0.6rem 0.55rem !important;
+    }
+    .category-tab {
+      flex-shrink: 0 !important;
+      padding: 0.48rem 0.95rem !important;
+      font-size: 0.86rem !important;
+    }
+  }
+</style>
+
 <main class="container page-content">
   <div class="page-header">
     <h1>جميع الأذكار 📿</h1>
@@ -23,16 +160,38 @@
         </button>
       </div>
     </div>
-
-    <!-- أزرار التنقل السريع بين أقسام الأذكار -->
-    <div class="category-tabs-bar">
-      <a href="#section-waking" class="category-tab">أذكار الاستيقاظ ☀️</a>
-      <a href="#section-sleep" class="category-tab">أذكار النوم 🌙</a>
-      <a href="#section-home" class="category-tab">أذكار المنزل 🏡</a>
-      <a href="#section-restroom" class="category-tab">أذكار الخلاء 🚪</a>
-      <a href="#section-wudu" class="category-tab">أذكار الوضوء 💧</a>
-    </div>
   </div>
+
+  <!-- أزرار التنقل السريع والمثبتة (Sticky) بين أقسام الأذكار -->
+  <nav class="azkar-nav-wrapper" aria-label="أقسام الأذكار">
+    <div class="category-tabs-bar" role="tablist">
+      <a href="#section-waking" class="category-tab active" data-target="section-waking">
+        <span class="category-tab-icon">☀️</span>
+        <span class="category-tab-title">أذكار الاستيقاظ</span>
+        <span class="category-tab-badge"><%= azkar.waking.length %></span>
+      </a>
+      <a href="#section-sleep" class="category-tab" data-target="section-sleep">
+        <span class="category-tab-icon">🌙</span>
+        <span class="category-tab-title">أذكار النوم</span>
+        <span class="category-tab-badge"><%= azkar.sleep.length %></span>
+      </a>
+      <a href="#section-home" class="category-tab" data-target="section-home">
+        <span class="category-tab-icon">🏡</span>
+        <span class="category-tab-title">أذكار المنزل</span>
+        <span class="category-tab-badge"><%= azkar.home.length %></span>
+      </a>
+      <a href="#section-restroom" class="category-tab" data-target="section-restroom">
+        <span class="category-tab-icon">🚪</span>
+        <span class="category-tab-title">أذكار الخلاء</span>
+        <span class="category-tab-badge"><%= azkar.restroom.length %></span>
+      </a>
+      <a href="#section-wudu" class="category-tab" data-target="section-wudu">
+        <span class="category-tab-icon">💧</span>
+        <span class="category-tab-title">أذكار الوضوء</span>
+        <span class="category-tab-badge"><%= azkar.wudu.length %></span>
+      </a>
+    </div>
+  </nav>
 
   <div class="daily-sections-wrapper">
     <!-- 1. أذكار الاستيقاظ من النوم -->
@@ -196,5 +355,91 @@
     </section>
   </div>
 </main>
+
+<!-- سكريبت التمرير السلس الذكي بدون أي تعارض -->
+<script>
+  (function() {
+    const tabs = document.querySelectorAll('.category-tab');
+    const sections = document.querySelectorAll('.daily-category-section');
+    const bar = document.querySelector('.category-tabs-bar');
+    let isClickScrolling = false;
+    let scrollTimeout = null;
+
+    // محاذاة التبويب النشط أفقياً داخل الشريط دون التأثير على الصفحة
+    function centerTabInBar(tab) {
+      if (!bar || !tab) return;
+      const tabLeft = tab.offsetLeft;
+      const tabWidth = tab.offsetWidth;
+      const barWidth = bar.clientWidth;
+      const targetScroll = tabLeft - (barWidth / 2) + (tabWidth / 2);
+
+      bar.scrollTo({
+        left: targetScroll,
+        behavior: 'smooth'
+      });
+    }
+
+    // التمرير السلس للقسم عند النقر
+    tabs.forEach(tab => {
+      tab.addEventListener('click', function(e) {
+        const targetId = this.getAttribute('data-target') || (this.getAttribute('href') || '').replace('#', '');
+        const targetSection = document.getElementById(targetId);
+
+        if (targetSection) {
+          e.preventDefault();
+          isClickScrolling = true;
+
+          // تحديث التبويب النشط
+          tabs.forEach(t => t.classList.remove('active'));
+          this.classList.add('active');
+          centerTabInBar(this);
+
+          // التمرير السلس المعتمد على scroll-margin-top
+          targetSection.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+
+          if (scrollTimeout) clearTimeout(scrollTimeout);
+          scrollTimeout = setTimeout(() => {
+            isClickScrolling = false;
+          }, 850);
+        }
+      });
+    });
+
+    // تحديث التبويب النشط عند التمرير الطبيعي بالماوس أو اللمس
+    function onWindowScroll() {
+      if (isClickScrolling || sections.length === 0) return;
+
+      const navOffset = 150;
+      const scrollPos = window.pageYOffset || document.documentElement.scrollTop || 0;
+
+      let currentId = '';
+      sections.forEach(sec => {
+        const top = sec.offsetTop - navOffset;
+        const height = sec.offsetHeight;
+        if (scrollPos >= top && scrollPos < top + height) {
+          currentId = sec.id;
+        }
+      });
+
+      if (currentId) {
+        tabs.forEach(t => {
+          const tId = t.getAttribute('data-target') || (t.getAttribute('href') || '').replace('#', '');
+          if (tId === currentId) {
+            if (!t.classList.contains('active')) {
+              tabs.forEach(x => x.classList.remove('active'));
+              t.classList.add('active');
+              centerTabInBar(t);
+            }
+          }
+        });
+      }
+    }
+
+    window.addEventListener('scroll', onWindowScroll, { passive: true });
+  })();
+</script>
 
 <%- include('partials/footer') %>

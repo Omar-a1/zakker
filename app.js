@@ -31,7 +31,7 @@ const Subscription = require('./data/Subscription');
 const azkarData = require('./data/azkar.json');
 
 // خدمات الإشعارات والجدولة
-const { sendNotificationToAll } = require('./services/notificationService');
+const { sendNotificationToAll, sendScheduledAzkarNotifications } = require('./services/notificationService');
 const {
   verifyQStashSignature,
   initQStashSchedules,
@@ -39,7 +39,7 @@ const {
 } = require('./services/qstashService');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 
 // 1. تهيئة الاتصال بقاعدة البيانات وخدمة Web Push
 connectDB().catch((err) => {
@@ -249,7 +249,7 @@ app.get('/api/vapid-public-key', (req, res) => {
   res.json({ publicKey: process.env.VAPID_PUBLIC_KEY || '' });
 });
 
-// 5. حفظ وتحديث اشتراك الجهاز في قاعدة بيانات MongoDB (Upsert)
+// 5. حفظ وتحديث اشتراك الجهاز في قاعدة بيانات MongoDB (Upsert مع دعم التوقيت المحلي)
 const handleSaveSubscription = async (req, res) => {
   try {
     const subscription = req.body;
@@ -260,6 +260,11 @@ const handleSaveSubscription = async (req, res) => {
     // التأكد من الاتصال بقاعدة البيانات قبل الحفظ
     await connectDB();
 
+    const timezone = subscription.timezone || 'Africa/Cairo';
+    const timezoneOffset = typeof subscription.timezoneOffset === 'number' ? subscription.timezoneOffset : -120;
+    const city = subscription.city || 'Cairo';
+    const country = subscription.country || 'Egypt';
+
     await Subscription.findOneAndUpdate(
       { endpoint: subscription.endpoint },
       {
@@ -268,14 +273,19 @@ const handleSaveSubscription = async (req, res) => {
         keys: {
           p256dh: subscription.keys.p256dh,
           auth: subscription.keys.auth
-        }
+        },
+        timezone,
+        timezoneOffset,
+        city,
+        country
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
     return res.status(201).json({ 
       success: true,
-      message: 'تم حفظ اشتراك الجهاز بنجاح في قاعدة البيانات وتفعيل الإشعارات.' 
+      message: 'تم حفظ اشتراك الجهاز بنجاح في قاعدة البيانات وتفعيل الإشعارات الذكية.',
+      timezone
     });
   } catch (err) {
     console.error('❌ خطأ أثناء حفظ الاشتراك في MongoDB:', err.message);
@@ -304,23 +314,35 @@ app.post('/api/send-notification', async (req, res) => {
   try {
     let result = null;
 
-    // أذكار الصباح
-    if (payload.type === 'morning-azkar') {
-      result = await sendNotificationToAll({
-        title: 'أذكار الصباح 🌅',
-        body: 'حان الآن وقت أذكار الصباح، ابدأ يومك بذكر الله وحصّن نفسك طوال النهار.',
-        url: '/morning',
-        tag: 'morning-azkar'
-      });
+    // 1. فحص وإرسال الأذكار المجدولة بذكاء لكافة المناطق الزمنية والدول
+    if (payload.type === 'check-scheduled-azkar') {
+      result = await sendScheduledAzkarNotifications();
     }
-    // أذكار المساء
+    // 2. أذكار الصباح (دعم الإرسال الذكي أو الإجباري لكافة المشتركين)
+    else if (payload.type === 'morning-azkar') {
+      if (payload.force) {
+        result = await sendNotificationToAll({
+          title: 'أذكار الصباح 🌅',
+          body: 'حان الآن وقت أذكار الصباح، ابدأ يومك بذكر الله وحصّن نفسك طوال النهار.',
+          url: '/morning',
+          tag: 'morning-azkar'
+        });
+      } else {
+        result = await sendScheduledAzkarNotifications();
+      }
+    }
+    // 3. أذكار المساء (دعم الإرسال الذكي أو الإجباري لكافة المشتركين)
     else if (payload.type === 'evening-azkar') {
-      result = await sendNotificationToAll({
-        title: 'أذكار المساء 🌇',
-        body: 'حان الآن وقت أذكار المساء، ألا بذكر الله تطمئن القلوب، حصّن نفسك حتى تصبح.',
-        url: '/evening',
-        tag: 'evening-azkar'
-      });
+      if (payload.force) {
+        result = await sendNotificationToAll({
+          title: 'أذكار المساء 🌇',
+          body: 'حان الآن وقت أذكار المساء، ألا بذكر الله تطمئن القلوب، حصّن نفسك حتى تصبح.',
+          url: '/evening',
+          tag: 'evening-azkar'
+        });
+      } else {
+        result = await sendScheduledAzkarNotifications();
+      }
     }
     // تنبيه أذان صلاة محددة
     else if (payload.type === 'prayer') {
@@ -434,31 +456,30 @@ function getCairoTimeHM() {
 if (!process.env.VERCEL) {
   const CRON_CAIRO_TZ = { timezone: 'Africa/Cairo' };
 
-  // 1. أذكار الصباح يومياً 06:30 صباحاً (توقيت القاهرة)
-  cron.schedule('30 6 * * *', async () => {
-    console.log('⏰ [Cron] إرسال أذكار الصباح...');
+  // 1. فحص دوري ذكي كل 15 دقيقة لإرسال أذكار الصباح والمساء لكل مستخدم حسب منطقته وتوقيته الصيفي/الشتوي
+  cron.schedule('*/15 * * * *', async () => {
     try {
-      await sendNotificationToAll({
-        title: 'أذكار الصباح 🌅',
-        body: 'حان الآن وقت أذكار الصباح، ابدأ يومك بذكر الله وحصّن نفسك طوال النهار.',
-        url: '/morning',
-        tag: 'morning-azkar'
-      });
+      await sendScheduledAzkarNotifications();
+    } catch (err) {
+      console.error('❌ [Smart Azkar Cron] خطأ في فحص الأذكار:', err.message);
+    }
+  });
+
+  // 2. أذكار الصباح يومياً 06:30 صباحاً (توقيت القاهرة) كاحتياطي إضافي
+  cron.schedule('30 6 * * *', async () => {
+    console.log('⏰ [Cron] إرسال أذكار الصباح (القاهرة)...');
+    try {
+      await sendScheduledAzkarNotifications();
     } catch (err) {
       console.error('❌ [Cron] فشل إرسال أذكار الصباح:', err.message);
     }
   }, CRON_CAIRO_TZ);
 
-  // 2. أذكار المساء يومياً 17:00 (5:00 مساءً بتوقيت القاهرة)
+  // 3. أذكار المساء يومياً 17:00 (5:00 مساءً بتوقيت القاهرة) كاحتياطي إضافي
   cron.schedule('0 17 * * *', async () => {
-    console.log('⏰ [Cron] إرسال أذكار المساء...');
+    console.log('⏰ [Cron] إرسال أذكار المساء (القاهرة)...');
     try {
-      await sendNotificationToAll({
-        title: 'أذكار المساء 🌇',
-        body: 'حان الآن وقت أذكار المساء، ألا بذكر الله تطمئن القلوب، حصّن نفسك حتى تصبح.',
-        url: '/evening',
-        tag: 'evening-azkar'
-      });
+      await sendScheduledAzkarNotifications();
     } catch (err) {
       console.error('❌ [Cron] فشل إرسال أذكار المساء:', err.message);
     }

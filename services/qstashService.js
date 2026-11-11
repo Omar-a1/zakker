@@ -1,4 +1,5 @@
 const { Client, Receiver } = require('@upstash/qstash');
+const { getEpochSecondsForTimezone } = require('./timezoneService');
 
 /**
  * الحصول على عميل QStash لإرسال المهام والجدولة
@@ -55,7 +56,6 @@ async function verifyQStashSignature(req) {
     const isValid = await receiver.verify({
       signature,
       body: rawBody,
-      // عدم تمرير url يمنع المشاكل الناتجة عن تغيير البروتوكول https/http خلف بروكسي Vercel
     });
     return isValid;
   } catch (err) {
@@ -65,47 +65,13 @@ async function verifyQStashSignature(req) {
 }
 
 /**
- * حساب الطابع الزمني بالثواني (Unix Epoch) لتوقيت القاهرة
+ * حساب الطابع الزمني بالثواني (Unix Epoch) لتوقيت القاهرة (متوافق مع الصيفي والشتوي)
  * @param {string} hhmm - الوقت بصيغة HH:MM
+ * @param {Date} [targetDate]
  * @returns {number}
  */
 function getEpochSecondsForCairo(hhmm, targetDate = new Date()) {
-  const [h, m] = hhmm.split(':').map(Number);
-  const now = targetDate;
-
-  // الحصول على تاريخ اليوم بتوقيت القاهرة
-  const dParts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Africa/Cairo',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric'
-  }).formatToParts(now);
-
-  const parts = {};
-  dParts.forEach((p) => { parts[p.type] = p.value; });
-
-  const targetUtcApprox = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), h, m, 0);
-
-  // حساب الفرق الحقيقي للتعامل بدقة مع التوقيت الصيفي/الشتوي في مصر
-  const cParts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Africa/Cairo',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    second: 'numeric',
-    hourCycle: 'h23'
-  }).formatToParts(new Date(targetUtcApprox));
-
-  const cp = {};
-  cParts.forEach((p) => { cp[p.type] = p.value; });
-
-  const actualUtc = Date.UTC(Number(cp.year), Number(cp.month) - 1, Number(cp.day), Number(cp.hour), Number(cp.minute), Number(cp.second));
-  const diff = actualUtc - targetUtcApprox;
-  const finalMs = targetUtcApprox - diff;
-
-  return Math.floor(finalMs / 1000);
+  return getEpochSecondsForTimezone(hhmm, 'Africa/Cairo', targetDate);
 }
 
 /**
@@ -143,22 +109,29 @@ async function initQStashSchedules(appUrl) {
     console.warn('⚠️ [QStash Cleanup] تعذر فحص الجداول السابقة:', cleanErr.message);
   }
 
+  // الجداول الدورية الحديثة المتوافقة مع التوقيت الصيفي والشتوي وجميع دول العالم
   const schedulesToSet = [
     {
-      id: 'zakker-morning-azkar',
-      cron: 'CRON_TZ=Africa/Cairo 30 6 * * *', // 06:30 صباحاً بتوقيت القاهرة
-      body: { type: 'morning-azkar' },
-      description: 'أذكار الصباح اليومية'
+      id: 'zakker-smart-azkar-check',
+      cron: 'CRON_TZ=UTC 0,30 * * * *', // تشغيل كل 30 دقيقة بتوقيت UTC لفحص كافة دول العالم
+      body: { type: 'check-scheduled-azkar' },
+      description: 'فحص وإرسال أذكار الصباح والمساء الذكي لكافة الدول والتوقيتات'
     },
     {
-      id: 'zakker-evening-azkar',
-      cron: 'CRON_TZ=Africa/Cairo 0 17 * * *', // 05:00 مساءً بتوقيت القاهرة
+      id: 'zakker-morning-azkar-cairo',
+      cron: 'CRON_TZ=Africa/Cairo 30 6 * * *', // 06:30 صباحاً بتوقيت القاهرة كنسخة احتياطية
+      body: { type: 'morning-azkar' },
+      description: 'أذكار الصباح اليومية (توقيت القاهرة)'
+    },
+    {
+      id: 'zakker-evening-azkar-cairo',
+      cron: 'CRON_TZ=Africa/Cairo 0 17 * * *', // 05:00 مساءً بتوقيت القاهرة كنسخة احتياطية
       body: { type: 'evening-azkar' },
-      description: 'أذكار المساء اليومية'
+      description: 'أذكار المساء اليومية (توقيت القاهرة)'
     },
     {
       id: 'zakker-daily-prayers',
-      cron: 'CRON_TZ=Africa/Cairo 5 0 * * *', // 00:05 بعد منتصف الليل يومياً بتوقيت القاهرة لجدولة صلوات اليوم
+      cron: 'CRON_TZ=Africa/Cairo 5 0 * * *', // 00:05 بعد منتصف الليل لجدولة صلوات اليوم
       body: { type: 'schedule-daily-prayers' },
       description: 'مجدول مواقيت الصلاة اليومي'
     }
@@ -246,7 +219,6 @@ async function scheduleDailyPrayersWithQStash(appUrl) {
   ];
 
   const currentEpochSeconds = Math.floor(Date.now() / 1000);
-  const nowIsoDate = new Date().toISOString().slice(0, 10);
   let scheduledPrayers = [];
 
   // دالة مساعدة لجدولة مصفوفة صلوات ليوم معين
@@ -259,14 +231,14 @@ async function scheduleDailyPrayersWithQStash(appUrl) {
       if (!rawTime) continue;
 
       const timeClean = rawTime.slice(0, 5);
-      const prayerEpoch = getEpochSecondsForCairo(timeClean, targetDate);
+      const prayerEpoch = getEpochSecondsForTimezone(timeClean, 'Africa/Cairo', targetDate);
 
       // التأكد من أن وقت الصلاة ما زال في المستقبل
       if (prayerEpoch > currentEpochSeconds) {
         const deduplicationId = `prayer-${prayer.key}-${isoDateStr}`;
         try {
           const msgRes = await client.publishJSON({
-            url: destination, // تم التصحيح: استخدام url بدلاً من destination المتوافقة مع publishJSON
+            url: destination,
             body: {
               type: 'prayer',
               prayerKey: prayer.key,
@@ -300,7 +272,7 @@ async function scheduleDailyPrayersWithQStash(appUrl) {
   const todayDate = new Date();
   scheduledPrayers = await schedulePrayersForDay(timings, todayDate, 'اليوم');
 
-  // 2. إذا كانت جميع صلوات اليوم قد انقضت (مثلاً في المساء بعد العشاء)، نقوم بجدولة صلوات الغد فوراً!
+  // 2. إذا كانت جميع صلوات اليوم قد انقضت (مثلاً في المساء بعد العشاء)، نقوم بجدولة صلوات الغد فوراً
   if (scheduledPrayers.length === 0) {
     console.log('🌙 [QStash Prayers] انقضت جميع صلوات اليوم، جاري جلب وجدولة صلوات الغد...');
     try {
@@ -339,7 +311,7 @@ async function publishNotificationTask({ destinationUrl, payload, delaySeconds =
   const destination = destinationUrl || `${(process.env.APP_URL || '').replace(/\/$/, '')}/api/send-notification`;
 
   const options = {
-    url: destination, // استخدام url متوافق مع QStash SDK
+    url: destination,
     body: payload,
     retries: Number(retries || 3),
   };
@@ -358,5 +330,6 @@ module.exports = {
   initQStashSchedules,
   scheduleDailyPrayersWithQStash,
   publishNotificationTask,
-  getEpochSecondsForCairo
+  getEpochSecondsForCairo,
+  getEpochSecondsForTimezone
 };

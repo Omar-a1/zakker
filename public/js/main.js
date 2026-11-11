@@ -31,6 +31,21 @@ function initThemeToggle() {
 const notifyBtn = document.getElementById('notifyBtn');
 let swRegistration = null;
 
+// تحويل كائن الاشتراك إلى بيانات متكاملة تشمل التوقيت الصيفي/الشتوي والمنطقة الزمنية
+function buildSubscriptionData(subscription) {
+  const subData = subscription.toJSON ? subscription.toJSON() : JSON.parse(JSON.stringify(subscription));
+  let tz = 'Africa/Cairo';
+  try {
+    tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Cairo';
+  } catch (e) {}
+
+  subData.timezone = tz;
+  subData.timezoneOffset = new Date().getTimezoneOffset();
+  subData.city = localStorage.getItem('zakker_city') || 'Cairo';
+  subData.country = localStorage.getItem('zakker_country') || 'Egypt';
+  return subData;
+}
+
 // تحويل مفتاح VAPID العام إلى Uint8Array المطلوب لـ PushManager
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -53,17 +68,18 @@ async function registerServiceWorker() {
       const readyReg = await navigator.serviceWorker.ready;
       swRegistration = readyReg;
 
-      // فحص إذا كان الجهاز مسجلاً في PushManager
+      // فحص إذا كان الجهاز مسجلاً في PushManager ومزامنة التوقيت المحلي معه
       const existingSub = await readyReg.pushManager.getSubscription();
       if (existingSub) {
-        console.log('تم العثور على اشتراك موجود، جارٍ مزامنته مع MongoDB...');
+        console.log('تم العثور على اشتراك موجود، جارٍ مزامنة التوقيت مع MongoDB...');
+        const payload = buildSubscriptionData(existingSub);
         await fetch('/api/save-subscription', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(existingSub)
+          body: JSON.stringify(payload)
         }).catch(() => {});
       } else if (Notification.permission === 'granted') {
-        // الإذن ممنوح ولكن لم ينشأ اشتراك Push بعد (مثلاً بعد عمل Reset Permissions)
+        // الإذن ممنوح ولكن لم ينشأ اشتراك Push بعد
         console.log('الإذن ممنوح، جارٍ إنشاء اشتراك Push وحفظه في MongoDB...');
         await subscribeUserToPush();
       }
@@ -112,11 +128,12 @@ async function subscribeUserToPush() {
       applicationServerKey: urlBase64ToUint8Array(publicKey)
     });
 
-    // 4. إرسال الاشتراك وحفظه في MongoDB
+    // 4. إرسال الاشتراك وحفظه في MongoDB شاملاً المنطقة الزمنية والتوقيت الصيفي/الشتوي
+    const payload = buildSubscriptionData(subscription);
     const saveRes = await fetch('/api/save-subscription', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(subscription)
+      body: JSON.stringify(payload)
     });
 
     const resJson = await saveRes.json();
@@ -124,7 +141,7 @@ async function subscribeUserToPush() {
       throw new Error(resJson.error || `فشل السيرفر في الحفظ (كود ${saveRes.status})`);
     }
 
-    console.log('✅ تم حفظ الاشتراك في MongoDB بنجاح:', resJson);
+    console.log('✅ تم حفظ الاشتراك في MongoDB بنجاح مع التوقيت الذكي:', resJson);
     return { success: true };
   } catch (err) {
     console.error('❌ فشل الاشتراك في Web Push:', err);
@@ -438,6 +455,23 @@ async function fetchPrayerTimesByCity(city = 'Cairo', country = 'Egypt') {
       cachedTimings = data.data.timings;
       updatePrayerUI(cachedTimings, `${cleanCity}، ${cleanCountry}`);
       startNextPrayerCountdown(cachedTimings);
+
+      // حفظ المدينة والدولة المختارة ومزامنتها مع اشتراك الإشعارات
+      try {
+        localStorage.setItem('zakker_city', cleanCity);
+        localStorage.setItem('zakker_country', cleanCountry);
+        if (swRegistration && swRegistration.pushManager) {
+          swRegistration.pushManager.getSubscription().then((sub) => {
+            if (sub) {
+              fetch('/api/save-subscription', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(buildSubscriptionData(sub))
+              }).catch(() => {});
+            }
+          }).catch(() => {});
+        }
+      } catch (e) {}
     }
   } catch (error) {
     console.error('خطأ في جلب مواقيت الصلاة:', error);

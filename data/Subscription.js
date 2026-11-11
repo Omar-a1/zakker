@@ -23,6 +23,38 @@ const subscriptionSchema = new mongoose.Schema({
       required: true,
       trim: true
     }
+  },
+  // المنطقة الزمنية الرسمية لجهاز المستخدم (IANA Timezone مثل Africa/Cairo, Asia/Riyadh, Asia/Dubai)
+  timezone: {
+    type: String,
+    default: 'Africa/Cairo',
+    trim: true,
+    index: true
+  },
+  // فرق التوقيت بالدقائق عن UTC (للتوافق الإضافي)
+  timezoneOffset: {
+    type: Number,
+    default: -120
+  },
+  // المدينة والدولة لحساب مواقيت الصلاة بدقة
+  city: {
+    type: String,
+    default: 'Cairo',
+    trim: true
+  },
+  country: {
+    type: String,
+    default: 'Egypt',
+    trim: true
+  },
+  // تاريخ آخر إشعار صباح ومساء تم إرساله بتوقيت المستخدم المحلي لمنع التكرار
+  lastMorningNotification: {
+    type: String,
+    default: null
+  },
+  lastEveningNotification: {
+    type: String,
+    default: null
   }
 }, {
   timestamps: true
