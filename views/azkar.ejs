@@ -3,29 +3,54 @@
 
 <!-- تضمين أنماط التنقل السريع والشريط المثبت لضمان الاستجابة السلسة والفورية -->
 <style>
+  :root {
+    --header-height: 64px;
+  }
+  @media (max-width: 768px) {
+    :root {
+      --header-height: 104px;
+    }
+  }
+
   html {
     scroll-behavior: smooth;
   }
   .daily-category-section {
-    scroll-margin-top: 135px !important;
+    scroll-margin-top: calc(var(--header-height, 64px) + 70px) !important;
   }
+  @media (max-width: 768px) {
+    .daily-category-section {
+      scroll-margin-top: calc(var(--header-height, 104px) + 70px) !important;
+    }
+  }
+
   .azkar-nav-wrapper {
     position: sticky !important;
-    top: 70px !important;
+    top: var(--header-height, 64px) !important;
     z-index: 45 !important;
     background: var(--bg-color, #f8fafc) !important;
-    padding: 0.55rem 0 !important;
-    margin: 1.5rem 0 1.5rem !important;
+    padding: 0.6rem 0 !important;
+    margin: 1rem 0 1.5rem !important;
     width: 100% !important;
-    border-bottom: 1px solid var(--border-color, #e2e8f0) !important;
-    backdrop-filter: blur(10px) !important;
-    -webkit-backdrop-filter: blur(10px) !important;
+    border-bottom: 1.5px solid var(--border-color, #e2e8f0) !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
     transition: background-color 0.25s ease, border-color 0.25s ease !important;
   }
   [data-theme="dark"] .azkar-nav-wrapper {
-    background: rgba(9, 13, 22, 0.94) !important;
-    border-bottom: 1px solid rgba(31, 41, 61, 0.8) !important;
+    background: rgba(9, 13, 22, 0.96) !important;
+    border-bottom: 1.5px solid rgba(31, 41, 61, 0.85) !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35) !important;
   }
+  @media (max-width: 768px) {
+    .azkar-nav-wrapper {
+      top: var(--header-height, 104px) !important;
+      padding: 0.5rem 0 !important;
+      margin: 0.5rem 0 1.25rem !important;
+    }
+  }
+
   .category-tabs-bar {
     display: flex !important;
     align-items: center !important;
@@ -116,19 +141,20 @@
     border: 1px solid var(--border-color, #e2e8f0) !important;
     padding: 0.35rem 1rem !important;
     border-radius: 999px !important;
-    margin: 0.75rem auto 0 !important;
+    margin: 1.25rem auto 0 !important;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03) !important;
   }
   .font-controls-label {
     font-size: 0.88rem !important;
     font-weight: 700 !important;
     color: var(--text-muted, #64748b) !important;
+    white-space: nowrap !important;
   }
   @media (max-width: 768px) {
     .category-tabs-bar {
       justify-content: flex-start !important;
       flex-wrap: nowrap !important;
-      padding: 0.35rem 0.6rem 0.55rem !important;
+      padding: 0.4rem 0.6rem 0.55rem !important;
     }
     .category-tab {
       flex-shrink: 0 !important;
@@ -365,6 +391,17 @@
     let isClickScrolling = false;
     let scrollTimeout = null;
 
+    // حساب الارتفاع الحقيقي للـ Navbar وضبطه ديناميكياً
+    function updateHeaderOffset() {
+      const header = document.querySelector('.main-header');
+      if (header) {
+        const h = Math.round(header.getBoundingClientRect().height);
+        document.documentElement.style.setProperty('--header-height', h + 'px');
+      }
+    }
+    updateHeaderOffset();
+    window.addEventListener('resize', updateHeaderOffset);
+
     // محاذاة التبويب النشط أفقياً داخل الشريط دون التأثير على الصفحة
     function centerTabInBar(tab) {
       if (!bar || !tab) return;
@@ -412,7 +449,9 @@
     function onWindowScroll() {
       if (isClickScrolling || sections.length === 0) return;
 
-      const navOffset = 150;
+      const header = document.querySelector('.main-header');
+      const headerH = header ? header.getBoundingClientRect().height : 104;
+      const navOffset = headerH + 75;
       const scrollPos = window.pageYOffset || document.documentElement.scrollTop || 0;
 
       let currentId = '';

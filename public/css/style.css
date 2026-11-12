@@ -8,12 +8,13 @@
   --text-main: #1e293b;
   --text-muted: #64748b;
   --border-color: #e2e8f0;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.08);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
   --radius: 14px;
   --radius-sm: 10px;
-  
+  --header-height: 64px;
+
   /* خطوط ثمانية المعتمدة */
   --font-logo: 'Thmanyah Serif Display', 'Thmanyah Serif Text', serif;
   --font-heading: 'Thmanyah Serif Display', 'Thmanyah Serif Text', serif;
@@ -34,9 +35,9 @@
   --text-main: #f1f5f9;
   --text-muted: #94a3b8;
   --border-color: #1f293d;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.45);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.6);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6);
 }
 
 /* ==================================================== */
@@ -104,7 +105,12 @@ body {
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-h1, h2, h3, h4, .modal-title, .banner-info h3 {
+h1,
+h2,
+h3,
+h4,
+.modal-title,
+.banner-info h3 {
   font-family: var(--font-heading);
   letter-spacing: -0.01em;
 }
@@ -224,6 +230,7 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
 .icon-sun {
   display: none;
 }
+
 .icon-moon {
   display: block;
 }
@@ -232,6 +239,7 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
   display: block;
   color: #fbbf24;
 }
+
 [data-theme="dark"] .icon-moon {
   display: none;
 }
@@ -353,11 +361,13 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
   align-items: center;
   gap: 0.5rem;
 }
-.font-btn-group{
+
+.font-btn-group {
   display: flex;
-  gap: 10px;
-  margin: 1.2rem 0
+  gap: 8px;
+  align-items: center;
 }
+
 .font-control-label {
   font-size: 0.9rem;
   color: var(--text-muted);
@@ -615,17 +625,21 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
     text-align: center;
     padding: 1.75rem 1.25rem;
   }
+
   .card-full-content {
     flex-direction: column;
     text-align: center;
     gap: 1rem;
   }
+
   .card-full-text {
     text-align: center;
   }
+
   .card-full-text p {
     margin-bottom: 1.25rem;
   }
+
   .card-full-btn {
     width: 100%;
     text-align: center;
@@ -805,7 +819,8 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
   cursor: pointer;
   transition: all 0.2s;
 }
-.btn-primary{
+
+.btn-primary {
   background: var(--primary-color);
   color: #ffffff;
   border: 1px solid var(--border-color);
@@ -817,11 +832,13 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
   cursor: pointer;
   transition: all 0.2s;
 }
-.btn-primary:hover{
+
+.btn-primary:hover {
   background: var(--primary-dark);
   border-color: var(--primary-color);
   color: #ffffff;
 }
+
 .btn-secondary:hover {
   background: var(--bg-color);
   border-color: var(--primary-color);
@@ -896,6 +913,10 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
 /* Responsive Media Queries */
 /* ==================================================== */
 @media (max-width: 768px) {
+  :root {
+    --header-height: 104px;
+  }
+
   .nav-links {
     display: none;
   }
@@ -903,6 +924,7 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
   .mobile-nav-bar {
     display: block;
   }
+
   .cards-grid {
     grid-template-columns: 1fr;
   }
@@ -1170,7 +1192,8 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
   background: var(--card-bg);
   color: var(--text-main);
 }
-.features-container{
+
+.features-container {
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1184,8 +1207,9 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
   text-align: center;
   /* background-color: var(--card-bg); */
 }
+
 .features-container h2,
-.features-container h3{
+.features-container h3 {
   margin: 10px;
   padding: 10px;
   color: var(--text-main);
@@ -1194,6 +1218,7 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
   align-items: center;
   gap: 10px;
 }
+
 /* .features-container h3::after{
   position: relative;
   top: 30px;
@@ -1206,7 +1231,7 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
   background-color: var(--primary-color);
 } */
 
-.features-card{
+.features-card {
   background-color: var(--card-bg);
   border-radius: var(--radius);
   padding: 10px;
@@ -1220,15 +1245,22 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
   justify-content: center;
   align-items: center;
 }
+
 .features-card p {
   color: var(--text-muted);
   font-size: 0.95rem;
   margin-bottom: 1.5rem;
   line-height: 1.6;
 }
+
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes modalScale {
@@ -1236,6 +1268,7 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
     opacity: 0;
     transform: scale(0.94);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -1348,23 +1381,47 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
   transition: all 0.2s ease;
 }
 
+.page-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.page-header h1 {
+  font-size: 2.25rem;
+  color: var(--primary-dark);
+  margin-bottom: 0.5rem;
+}
+
+[data-theme="dark"] .page-header h1 {
+  color: var(--primary-light);
+}
+
+.page-header p {
+  color: var(--text-muted);
+  font-size: 1.05rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
 .font-controls-bar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
   background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  padding: 0.35rem 1rem;
+  border: 1.5px solid var(--border-color);
+  padding: 0.45rem 1.15rem;
   border-radius: 999px;
-  margin: 0.75rem auto 0;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  margin: 1.25rem auto 0;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
 }
 
 .font-controls-label {
   font-size: 0.88rem;
   font-weight: 700;
   color: var(--text-muted);
+  white-space: nowrap;
 }
 
 @media (max-width: 768px) {
@@ -1437,4 +1494,3 @@ h1, h2, h3, h4, .modal-title, .banner-info h3 {
   text-decoration: underline;
   opacity: 0.85;
 }
-
