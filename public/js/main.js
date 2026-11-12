@@ -329,26 +329,118 @@ function showNotification(title, body) {
 // ----------------------------------------------------
 // 3. عدادات الأذكار (Azkar Counters)
 // ----------------------------------------------------
+// 3. عدادات الأذكار وحفظ التقدم (Azkar Counters & State Persistence)
+// ----------------------------------------------------
+
+function getCurrentAzkarPageKey() {
+  const path = window.location.pathname.replace(/\/$/, '') || '/';
+  if (path === '/morning') return 'morning';
+  if (path === '/evening') return 'evening';
+  if (path === '/azkar' || path === '/daily') return 'azkar';
+  if (path === '/sleep') return 'sleep';
+  if (path === '/waking') return 'waking';
+  if (path === '/home-azkar') return 'home_azkar';
+  if (path === '/restroom') return 'restroom';
+  if (path === '/wudu') return 'wudu';
+  return null;
+}
+
+function getAzkarStorageKey(pageKey) {
+  return `zakker_counters_${pageKey}`;
+}
+
+function loadAzkarProgress(pageKey) {
+  if (!pageKey) return {};
+  try {
+    const raw = localStorage.getItem(getAzkarStorageKey(pageKey));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    const today = new Date().toISOString().slice(0, 10);
+    // تصفير تلقائي لأذكار الصباح والمساء في يوم جديد
+    if (parsed.date && parsed.date !== today && (pageKey === 'morning' || pageKey === 'evening')) {
+      localStorage.removeItem(getAzkarStorageKey(pageKey));
+      return {};
+    }
+    return parsed.counters || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveAzkarProgress(pageKey, counters) {
+  if (!pageKey) return;
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    localStorage.setItem(getAzkarStorageKey(pageKey), JSON.stringify({
+      date: today,
+      counters: counters
+    }));
+  } catch (e) {}
+}
+
 function initAzkarCounters() {
+  const pageKey = getCurrentAzkarPageKey();
   const counterButtons = document.querySelectorAll('.zekr-counter-btn');
+  if (counterButtons.length === 0) return;
 
-  counterButtons.forEach(btn => {
+  const savedCounters = pageKey ? loadAzkarProgress(pageKey) : {};
+
+  counterButtons.forEach((btn, idx) => {
+    const card = btn.closest('.zekr-card');
+    const cardId = (card && card.id) ? card.id : `zekr-card-${idx}`;
+    const target = parseInt(btn.dataset.target, 10) || 1;
+    let saved = savedCounters[cardId] !== undefined ? parseInt(savedCounters[cardId], 10) : 0;
+
+    // استعادة الحالة المحفوظة للزر والبطاقة
+    if (saved > 0) {
+      if (saved > target) saved = target;
+      btn.dataset.current = saved;
+      const countSpan = btn.querySelector('.count-num');
+      if (countSpan) countSpan.textContent = saved;
+
+      if (saved >= target) {
+        btn.classList.add('done');
+        btn.textContent = '✓';
+        if (card) card.classList.add('completed');
+      }
+    }
+
     btn.addEventListener('click', () => {
-      const target = parseInt(btn.dataset.target, 10);
-      let current = parseInt(btn.dataset.current, 10);
+      const curTarget = parseInt(btn.dataset.target, 10) || 1;
+      let cur = parseInt(btn.dataset.current, 10) || 0;
 
-      if (current < target) {
-        current++;
-        btn.dataset.current = current;
+      if (cur < curTarget) {
+        cur++;
+        btn.dataset.current = cur;
         const countSpan = btn.querySelector('.count-num');
-        if (countSpan) countSpan.textContent = current;
+        if (countSpan) countSpan.textContent = cur;
+
+        // اهتزاز لمسي خفيف على الهواتف الذكية (Haptic feedback)
+        if ('vibrate' in navigator) {
+          try { navigator.vibrate(25); } catch (e) {}
+        }
 
         // عند اكتمال العدد
-        if (current >= target) {
+        if (cur >= curTarget) {
           btn.classList.add('done');
           btn.textContent = '✓';
-          const card = btn.closest('.zekr-card');
-          if (card) card.classList.add('completed');
+          const parentCard = btn.closest('.zekr-card');
+          if (parentCard) parentCard.classList.add('completed');
+
+          if ('vibrate' in navigator) {
+            try { navigator.vibrate([40, 50, 40]); } catch (e) {}
+          }
+        }
+
+        // حفظ التقدم في localStorage
+        if (pageKey) {
+          savedCounters[cardId] = cur;
+          saveAzkarProgress(pageKey, savedCounters);
+        }
+
+        // تحديث شريط التقدم الفوري
+        if (typeof updateReadingProgressBar === 'function') {
+          updateReadingProgressBar();
         }
       }
     });
@@ -665,13 +757,121 @@ function initFontSizeControls() {
 }
 
 // ----------------------------------------------------
-// 6. تهيئة الصفحة عند التحميل (DOMContentLoaded)
+// 6. شريط تقدم القراءة (Reading Progress Bar)
+// ----------------------------------------------------
+
+function updateReadingProgressBar() {
+  const bar = document.getElementById('reading-progress-bar');
+  if (!bar) return;
+
+  const allCards = document.querySelectorAll('.zekr-card');
+  const total = allCards.length;
+  if (total === 0) {
+    bar.style.display = 'none';
+    return;
+  }
+
+  const completed = document.querySelectorAll('.zekr-card.completed').length;
+  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  const pctEl = document.getElementById('reading-progress-pct');
+  const fillEl = document.getElementById('reading-progress-fill');
+  const labelEl = document.getElementById('reading-progress-label');
+  const restoreBtn = document.getElementById('reading-progress-restore');
+
+  if (pctEl) pctEl.textContent = `${pct}%`;
+  if (fillEl) {
+    fillEl.style.width = `${pct}%`;
+    if (pct === 100) {
+      fillEl.classList.add('all-done');
+    } else {
+      fillEl.classList.remove('all-done');
+    }
+  }
+
+  if (labelEl) {
+    if (pct === 100) {
+      labelEl.textContent = 'أتممت الأذكار كاملة 🎉';
+    } else {
+      labelEl.textContent = `${completed} من ${total} مكتمل`;
+    }
+  }
+
+  // إظهار زر "استكمال" فقط إذا كان هناك أذكار مكتملة وأخرى متبقية
+  if (restoreBtn) {
+    if (completed > 0 && completed < total) {
+      restoreBtn.classList.add('visible');
+    } else {
+      restoreBtn.classList.remove('visible');
+    }
+  }
+}
+
+function initReadingProgress() {
+  const pageKey = getCurrentAzkarPageKey();
+  const allCards = document.querySelectorAll('.zekr-card');
+  const bar = document.getElementById('reading-progress-bar');
+
+  if (!pageKey || allCards.length === 0 || !bar) {
+    if (bar) bar.style.display = 'none';
+    return;
+  }
+
+  // تفعيل شريط التقدم وإضافة مسافة سفلية للـ body
+  bar.style.display = 'block';
+  document.body.classList.add('has-progress-bar');
+
+  // تحديث الشريط بحالة الأذكار الابتدائية
+  updateReadingProgressBar();
+
+  // زر استكمال القراءة: التمرير السلس لأول ذكر غير مكتمل
+  const restoreBtn = document.getElementById('reading-progress-restore');
+  if (restoreBtn) {
+    restoreBtn.addEventListener('click', () => {
+      const firstIncomplete = document.querySelector('.zekr-card:not(.completed)');
+      if (firstIncomplete) {
+        const headerH = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--header-height') || '64', 10);
+        const top = firstIncomplete.getBoundingClientRect().top + window.scrollY - headerH - 16;
+        window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+      }
+    });
+  }
+
+  // زر إعادة تعيين الأذكار للبدء من جديد
+  const resetBtn = document.getElementById('reading-progress-reset');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      if (confirm('هل ترغب في إعادة ضبط العدادات للبدء من جديد؟')) {
+        const storageKey = getAzkarStorageKey(pageKey);
+        localStorage.removeItem(storageKey);
+
+        allCards.forEach(card => {
+          card.classList.remove('completed');
+          const btn = card.querySelector('.zekr-counter-btn');
+          if (btn) {
+            btn.classList.remove('done');
+            const target = btn.dataset.target || '1';
+            btn.dataset.current = '0';
+            btn.innerHTML = `<span class="count-num">0</span> / ${target}`;
+          }
+        });
+
+        updateReadingProgressBar();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    });
+  }
+}
+
+// ----------------------------------------------------
+// 7. تهيئة الصفحة عند التحميل (DOMContentLoaded)
 // ----------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
   initThemeToggle();
   initNotifications();
   initAzkarCounters();
   initFontSizeControls();
+  initReadingProgress();
 
   // مستمعات صفحة الصلوات
   const fetchBtn = document.getElementById('fetchPrayersBtn');

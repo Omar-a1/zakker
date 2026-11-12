@@ -84,36 +84,87 @@ function getUserLocalDateTime(timeZone = 'Africa/Cairo', baseDate = new Date()) 
 }
 
 /**
- * فحص ما إذا كان الوقت الحالي في المنطقة الزمنية يقع ضمن نافذة أذكار الصباح
- * النافذة المعتمدة: من 06:15 صباحاً حتى 08:00 صباحاً (الموعد المستهدف: 06:30)
- * 
- * @param {string} timeZone 
- * @param {Date} [baseDate]
- * @returns {boolean}
+ * تحويل وقت HH:MM إلى دقائق من منتصف الليل
+ * @param {string} hhmm
+ * @returns {number|null}
  */
-function isMorningAzkarTime(timeZone, baseDate = new Date()) {
-  const { hours, minutes } = getUserLocalDateTime(timeZone, baseDate);
-  // من الساعة 06:15 حتى 07:59
-  if (hours === 6 && minutes >= 15) return true;
-  if (hours === 7) return true;
-  return false;
+function hmToMinutes(hhmm) {
+  const match = String(hhmm || '').match(/(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
 }
 
 /**
- * فحص ما إذا كان الوقت الحالي في المنطقة الزمنية يقع ضمن نافذة أذكار المساء
- * النافذة المعتمدة: من 16:45 مساءً حتى 18:30 مساءً (الموعد المستهدف: 17:00 / 5:00م)
- * 
- * @param {string} timeZone 
- * @param {Date} [baseDate]
+ * إضافة دقائق إلى وقت HH:MM مع اللف حول منتصف الليل
+ * @param {string} hhmm
+ * @param {number} deltaMinutes
+ * @returns {string|null}
+ */
+function addMinutesToHm(hhmm, deltaMinutes) {
+  const mins = hmToMinutes(hhmm);
+  if (mins == null) return null;
+  const total = ((mins + deltaMinutes) % 1440 + 1440) % 1440;
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/**
+ * هل الوقت المحلي الحالي داخل نافذة [start, end) بالدقائق؟
+ * @param {number} hours
+ * @param {number} minutes
+ * @param {string} startHHMM
+ * @param {number} durationMinutes
+ * @param {string} [endCapHHMM] حد علوي اختياري (مثل المغرب)
  * @returns {boolean}
  */
-function isEveningAzkarTime(timeZone, baseDate = new Date()) {
+function isLocalTimeInWindow(hours, minutes, startHHMM, durationMinutes, endCapHHMM) {
+  const start = hmToMinutes(startHHMM);
+  if (start == null) return false;
+
+  const current = hours * 60 + minutes;
+  let end = start + durationMinutes;
+  const cap = hmToMinutes(endCapHHMM);
+  if (cap != null && cap > start) {
+    end = Math.min(end, cap);
+  }
+  if (end <= start) return false;
+
+  if (end <= 1440) {
+    return current >= start && current < end;
+  }
+  return current >= start || current < (end - 1440);
+}
+
+/**
+ * فحص نافذة أذكار الصباح: بعد الفجر بساعة (ولمدة ساعة لتغطية جدولة QStash)
+ *
+ * @param {string} timeZone
+ * @param {Date} [baseDate]
+ * @param {string} [fajrHHMM]
+ * @returns {boolean}
+ */
+function isMorningAzkarTime(timeZone, baseDate = new Date(), fajrHHMM) {
+  if (!fajrHHMM) return false;
   const { hours, minutes } = getUserLocalDateTime(timeZone, baseDate);
-  // من 16:45 حتى 18:30
-  if (hours === 16 && minutes >= 45) return true;
-  if (hours === 17) return true;
-  if (hours === 18 && minutes <= 30) return true;
-  return false;
+  const start = addMinutesToHm(fajrHHMM, 60);
+  return isLocalTimeInWindow(hours, minutes, start, 60);
+}
+
+/**
+ * فحص نافذة أذكار المساء: بعد العصر بساعة، وقبل المغرب
+ *
+ * @param {string} timeZone
+ * @param {Date} [baseDate]
+ * @param {string} [asrHHMM]
+ * @param {string} [maghribHHMM]
+ * @returns {boolean}
+ */
+function isEveningAzkarTime(timeZone, baseDate = new Date(), asrHHMM, maghribHHMM) {
+  if (!asrHHMM) return false;
+  const { hours, minutes } = getUserLocalDateTime(timeZone, baseDate);
+  const start = addMinutesToHm(asrHHMM, 60);
+  return isLocalTimeInWindow(hours, minutes, start, 60, maghribHHMM);
 }
 
 /**
@@ -178,6 +229,8 @@ module.exports = {
   getUserLocalDateTime,
   isMorningAzkarTime,
   isEveningAzkarTime,
-  getEpochSecondsForTimezone
+  getEpochSecondsForTimezone,
+  hmToMinutes,
+  addMinutesToHm
 };
 

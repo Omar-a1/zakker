@@ -1494,3 +1494,199 @@ h4,
   text-decoration: underline;
   opacity: 0.85;
 }
+
+/* ============================================================
+   شريط التقدم في إنجاز الأذكار (Reading Progress Bar)
+   ============================================================ */
+.reading-progress-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--card-bg, #ffffff);
+  border-top: 1.5px solid var(--border-color, rgba(0, 0, 0, 0.08));
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+  z-index: 990;
+  padding: 8px 16px;
+  padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+
+[data-theme="dark"] .reading-progress-bar {
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.reading-progress-container {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.reading-progress-info {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-shrink: 0;
+  min-width: 110px;
+}
+
+.reading-progress-pct {
+  font-family: 'Cairo', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--primary-color, #0f766e);
+  min-width: 42px;
+  text-align: right;
+  line-height: 1;
+}
+
+[data-theme="dark"] .reading-progress-pct {
+  color: #2dd4bf;
+}
+
+.reading-progress-label {
+  font-family: 'Cairo', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  white-space: nowrap;
+}
+
+.reading-progress-track {
+  flex: 1;
+  height: 8px;
+  background: rgba(15, 118, 110, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+
+[data-theme="dark"] .reading-progress-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.reading-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--primary-color, #0f766e), #14b8a6);
+  border-radius: 999px;
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.reading-progress-fill.all-done {
+  background: linear-gradient(90deg, #10b981, #f59e0b);
+}
+
+.reading-progress-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.progress-ctrl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 32px;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: 'Cairo', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.progress-restore-btn {
+  background: var(--primary-color, #0f766e);
+  color: #ffffff;
+  padding: 0 12px;
+  display: none;
+}
+
+.progress-restore-btn.visible {
+  display: inline-flex;
+}
+
+.progress-restore-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.progress-restore-btn:active {
+  transform: translateY(0);
+}
+
+.progress-reset-btn {
+  background: transparent;
+  color: var(--text-muted, #64748b);
+  border-color: var(--border-color, rgba(0, 0, 0, 0.12));
+  width: 32px;
+  padding: 0;
+}
+
+[data-theme="dark"] .progress-reset-btn {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #94a3b8;
+}
+
+.progress-reset-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+/* مسافة سفلية للصفحة حتى لا يغطي الشريط آخر بطاقة */
+body.has-progress-bar {
+  padding-bottom: 74px;
+}
+
+@media (max-width: 600px) {
+  .reading-progress-bar {
+    padding: 6px 12px;
+    padding-bottom: max(6px, env(safe-area-inset-bottom, 6px));
+  }
+
+  .reading-progress-container {
+    gap: 8px;
+  }
+
+  .reading-progress-info {
+    min-width: 85px;
+    gap: 4px;
+  }
+
+  .reading-progress-pct {
+    font-size: 0.95rem;
+    min-width: 36px;
+  }
+
+  .reading-progress-label {
+    font-size: 0.72rem;
+  }
+
+  .progress-restore-btn {
+    padding: 0 8px;
+    font-size: 0.74rem;
+    height: 30px;
+  }
+
+  .progress-reset-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  body.has-progress-bar {
+    padding-bottom: 68px;
+  }
+}

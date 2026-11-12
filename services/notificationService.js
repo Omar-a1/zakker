@@ -16,6 +16,47 @@ const {
   normalizeTimezone
 } = require('./timezoneService');
 
+const prayerTimingsCache = new Map();
+const PRAYER_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+
+function extractPrayerHHMM(value) {
+  const match = String(value || '').match(/(\d{1,2}):(\d{2})/);
+  if (!match) return '';
+  return `${match[1].padStart(2, '0')}:${match[2]}`;
+}
+
+async function fetchPrayerTimings(city, country) {
+  const cleanCity = (city || 'Cairo').trim() || 'Cairo';
+  const cleanCountry = (country || 'Egypt').trim() || 'Egypt';
+  const cacheKey = `${cleanCity.toLowerCase()}|${cleanCountry.toLowerCase()}`;
+  const cached = prayerTimingsCache.get(cacheKey);
+
+  if (cached && (Date.now() - cached.fetchedAt) < PRAYER_CACHE_TTL_MS) {
+    return cached.timings;
+  }
+
+  try {
+    const url = `https://api.aladhan.com/v1/timingsByCity?city=${encodeURIComponent(cleanCity)}&country=${encodeURIComponent(cleanCountry)}&method=5`;
+    const res = await fetch(url);
+    const json = await res.json();
+    if (json.code === 200 && json.data && json.data.timings) {
+      const timings = {
+        Fajr: extractPrayerHHMM(json.data.timings.Fajr),
+        Asr: extractPrayerHHMM(json.data.timings.Asr),
+        Maghrib: extractPrayerHHMM(json.data.timings.Maghrib)
+      };
+      if (timings.Fajr && timings.Asr) {
+        prayerTimingsCache.set(cacheKey, { timings, fetchedAt: Date.now() });
+        return timings;
+      }
+    }
+  } catch (err) {
+    console.warn(`⚠️ [Scheduled Azkar] تعذر جلب المواقيت لـ ${cleanCity}, ${cleanCountry}:`, err.message);
+  }
+
+  return cached ? cached.timings : null;
+}
+
 /**
  * إرسال إشعار لجهاز محدد عبر PushManager
  * @param {object} sub - مستند الاشتراك
@@ -59,13 +100,14 @@ async function sendScheduledAzkarNotifications() {
     return { morningSent: 0, eveningSent: 0, failed: 0, deleted: 0, total: 0 };
   }
 
-  console.log(`🧭 [Scheduled Azkar] فحص مواعيد الأذكار لـ ${subscriptions.length} جهاز حسب التوقيت المحلي...`);
+  console.log(`🧭 [Scheduled Azkar] فحص مواعيد الأذكار لـ ${subscriptions.length} جهاز حسب الفجر والعصر المحلي...`);
 
   let morningSent = 0;
   let eveningSent = 0;
   let failed = 0;
   const invalidSubscriptionIds = [];
   const updatePromises = [];
+  const timingsByLocation = new Map();
 
   const morningPayload = JSON.stringify({
     title: 'أذكار الصباح 🌅',
@@ -88,12 +130,24 @@ async function sendScheduledAzkarNotifications() {
   for (const sub of subscriptions) {
     const tz = normalizeTimezone(sub.timezone);
     const local = getUserLocalDateTime(tz);
+    const city = sub.city || 'Cairo';
+    const country = sub.country || 'Egypt';
+    const locationKey = `${String(city).trim().toLowerCase()}|${String(country).trim().toLowerCase()}`;
+
+    if (!timingsByLocation.has(locationKey)) {
+      timingsByLocation.set(locationKey, fetchPrayerTimings(city, country));
+    }
+    const timings = await timingsByLocation.get(locationKey);
+    if (!timings) {
+      console.warn(`⚠️ [Scheduled Azkar] لا توجد مواقيت لـ ${city}, ${country} — تم تخطي الجهاز.`);
+      continue;
+    }
 
     let needsUpdate = false;
     let updateFields = {};
 
-    // 1. فحص أذكار الصباح
-    const isMorning = isMorningAzkarTime(tz);
+    // 1. فحص أذكار الصباح (بعد الفجر بساعة)
+    const isMorning = isMorningAzkarTime(tz, new Date(), timings.Fajr);
     const hasReceivedMorningToday = sub.lastMorningNotification === local.dateStr;
 
     if (isMorning && !hasReceivedMorningToday) {
@@ -102,7 +156,7 @@ async function sendScheduledAzkarNotifications() {
         morningSent++;
         needsUpdate = true;
         updateFields.lastMorningNotification = local.dateStr;
-        console.log(`🌅 [Morning Azkar] أُرسلت بنجاح إلى جهاز (${tz} - الساعة ${local.timeHM})`);
+        console.log(`🌅 [Morning Azkar] أُرسلت بنجاح إلى جهاز (${tz} - ${city} - الساعة ${local.timeHM} | فجر ${timings.Fajr})`);
       } else {
         failed++;
         if (res.statusCode === 404 || res.statusCode === 410) {
@@ -111,8 +165,8 @@ async function sendScheduledAzkarNotifications() {
       }
     }
 
-    // 2. فحص أذكار المساء
-    const isEvening = isEveningAzkarTime(tz);
+    // 2. فحص أذكار المساء (بعد العصر بساعة وقبل المغرب)
+    const isEvening = isEveningAzkarTime(tz, new Date(), timings.Asr, timings.Maghrib);
     const hasReceivedEveningToday = sub.lastEveningNotification === local.dateStr;
 
     if (isEvening && !hasReceivedEveningToday) {
@@ -121,7 +175,7 @@ async function sendScheduledAzkarNotifications() {
         eveningSent++;
         needsUpdate = true;
         updateFields.lastEveningNotification = local.dateStr;
-        console.log(`🌇 [Evening Azkar] أُرسلت بنجاح إلى جهاز (${tz} - الساعة ${local.timeHM})`);
+        console.log(`🌇 [Evening Azkar] أُرسلت بنجاح إلى جهاز (${tz} - ${city} - الساعة ${local.timeHM} | عصر ${timings.Asr})`);
       } else {
         failed++;
         if (res.statusCode === 404 || res.statusCode === 410) {
