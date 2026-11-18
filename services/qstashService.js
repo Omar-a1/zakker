@@ -125,7 +125,7 @@ async function initQStashSchedules(appUrl) {
     },
     {
       id: 'zakker-evening-azkar-cairo',
-      cron: 'CRON_TZ=Africa/Cairo 0 17 * * *', // 05:00 مساءً بتوقيت القاهرة كنسخة احتياطية
+      cron: 'CRON_TZ=Africa/Cairo 0 16 * * *', // 04:00 مساءً بتوقيت القاهرة — قبل المغرب في الشتاء والصيف
       body: { type: 'evening-azkar' },
       description: 'أذكار المساء اليومية (توقيت القاهرة)'
     },

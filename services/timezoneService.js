@@ -115,7 +115,7 @@ function addMinutesToHm(hhmm, deltaMinutes) {
  * @param {number} minutes
  * @param {string} startHHMM
  * @param {number} durationMinutes
- * @param {string} [endCapHHMM] حد علوي اختياري (مثل المغرب)
+ * @param {string} [endCapHHMM] حد علوي اختياري (مثل المغرب) — لكن لا يقلل النافذة أقل من 30 دقيقة
  * @returns {boolean}
  */
 function isLocalTimeInWindow(hours, minutes, startHHMM, durationMinutes, endCapHHMM) {
@@ -126,7 +126,9 @@ function isLocalTimeInWindow(hours, minutes, startHHMM, durationMinutes, endCapH
   let end = start + durationMinutes;
   const cap = hmToMinutes(endCapHHMM);
   if (cap != null && cap > start) {
-    end = Math.min(end, cap);
+    // لا نقلص النافذة أقل من 30 دقيقة حتى لا تُضيّع دورة QStash
+    const minEnd = start + 30;
+    end = Math.max(minEnd, Math.min(end, cap));
   }
   if (end <= start) return false;
 
@@ -137,7 +139,7 @@ function isLocalTimeInWindow(hours, minutes, startHHMM, durationMinutes, endCapH
 }
 
 /**
- * فحص نافذة أذكار الصباح: بعد الفجر بساعة (ولمدة ساعة لتغطية جدولة QStash)
+ * فحص نافذة أذكار الصباح: بعد الفجر بساعة (ولمدة 90 دقيقة لتغطية دورتين من QStash)
  *
  * @param {string} timeZone
  * @param {Date} [baseDate]
@@ -148,11 +150,13 @@ function isMorningAzkarTime(timeZone, baseDate = new Date(), fajrHHMM) {
   if (!fajrHHMM) return false;
   const { hours, minutes } = getUserLocalDateTime(timeZone, baseDate);
   const start = addMinutesToHm(fajrHHMM, 60);
-  return isLocalTimeInWindow(hours, minutes, start, 60);
+  // نافذة 90 دقيقة لضمان عدم فوات أي دورة QStash
+  return isLocalTimeInWindow(hours, minutes, start, 90);
 }
 
 /**
  * فحص نافذة أذكار المساء: بعد العصر بساعة، وقبل المغرب
+ * النافذة 90 دقيقة لضمان التغطية بين دورتين متتاليتين لـ QStash (كل 30 دقيقة)
  *
  * @param {string} timeZone
  * @param {Date} [baseDate]
@@ -164,7 +168,8 @@ function isEveningAzkarTime(timeZone, baseDate = new Date(), asrHHMM, maghribHHM
   if (!asrHHMM) return false;
   const { hours, minutes } = getUserLocalDateTime(timeZone, baseDate);
   const start = addMinutesToHm(asrHHMM, 60);
-  return isLocalTimeInWindow(hours, minutes, start, 60, maghribHHMM);
+  // نافذة 90 دقيقة بدلاً من 60 لضمان عدم فوات أي دورة QStash
+  return isLocalTimeInWindow(hours, minutes, start, 90, maghribHHMM);
 }
 
 /**

@@ -227,7 +227,10 @@ async function requestNotificationPermission() {
       if (swRegistration) {
         await subscribeUserToPush();
       }
-      showNotification('تطبيق ذكّر 🕌', 'تم تفعيل التنبيهات بنجاح! ستصلك إشعارات الأذان والأذكار حتى لو كان الموقع مغلقاً.');
+      if (cachedTimings) {
+        scheduleAllOfflineNotifications(cachedTimings);
+      }
+      showNotification('تطبيق ذكّر 🕌', 'تم تفعيل التنبيهات بنجاح! ستصلك إشعارات الأذان والأذكار حتى لو كان التطبيق مغلقاً أو بدون إنترنت.');
     } else if (permission === 'denied') {
       openNotificationModal('blocked');
     }
@@ -519,7 +522,7 @@ const ARABIC_COUNTRY_MAP = {
   'السودان': 'Sudan'
 };
 
-// جلب المواقيت بالمدينة والدولة مع دعم كامل للاسم العربي والاتصال البديل
+// جلب المواقيت بالمدينة والدولة مع دعم كامل للاسم العربي والاتصال البديل ودعم Offline
 async function fetchPrayerTimesByCity(city = 'Cairo', country = 'Egypt') {
   const cleanCity = (city || 'Cairo').trim();
   const cleanCountry = (country || 'Egypt').trim();
@@ -539,8 +542,12 @@ async function fetchPrayerTimesByCity(city = 'Cairo', country = 'Egypt') {
 
     // 2. إذا فشل الطلب الخارجي، نستخدم المسار المحلي للسيرفر
     if (!data || data.code !== 200 || !data.data) {
-      const fallbackResponse = await fetch(`/api/prayers?city=${encodeURIComponent(queryCity)}&country=${encodeURIComponent(queryCountry)}`);
-      data = await fallbackResponse.json();
+      try {
+        const fallbackResponse = await fetch(`/api/prayers?city=${encodeURIComponent(queryCity)}&country=${encodeURIComponent(queryCountry)}`);
+        data = await fallbackResponse.json();
+      } catch (errLocal) {
+        console.warn('تعذر الاتصال بالخادم المحلي، جاري محاولة القراءة من كاش Offline...');
+      }
     }
 
     if (data && (data.code === 200 || data.data)) {
@@ -548,10 +555,18 @@ async function fetchPrayerTimesByCity(city = 'Cairo', country = 'Egypt') {
       updatePrayerUI(cachedTimings, `${cleanCity}، ${cleanCountry}`);
       startNextPrayerCountdown(cachedTimings);
 
-      // حفظ المدينة والدولة المختارة ومزامنتها مع اشتراك الإشعارات
+      // حفظ المواقيت محلياً للعمل بدون إنترنت
       try {
+        localStorage.setItem('zakker_cached_timings', JSON.stringify(cachedTimings));
         localStorage.setItem('zakker_city', cleanCity);
         localStorage.setItem('zakker_country', cleanCountry);
+      } catch (e) {}
+
+      // جدولة الإشعارات أوفلاين في التطبيق
+      scheduleAllOfflineNotifications(cachedTimings);
+
+      // حفظ المدينة والدولة المختارة ومزامنتها مع اشتراك الإشعارات
+      try {
         if (swRegistration && swRegistration.pushManager) {
           swRegistration.pushManager.getSubscription().then((sub) => {
             if (sub) {
@@ -564,9 +579,31 @@ async function fetchPrayerTimesByCity(city = 'Cairo', country = 'Egypt') {
           }).catch(() => {});
         }
       } catch (e) {}
+    } else {
+      restoreCachedPrayerTimings(cleanCity, cleanCountry);
     }
   } catch (error) {
-    console.error('خطأ في جلب مواقيت الصلاة:', error);
+    console.error('خطأ في جلب مواقيت الصلاة، محاولة الاستعادة من الكاش:', error);
+    restoreCachedPrayerTimings(cleanCity, cleanCountry);
+  }
+}
+
+// استعادة مواقيت الصلاة من الكاش المحلي عند انقطاع الإنترنت (Offline Mode)
+function restoreCachedPrayerTimings(city = 'Cairo', country = 'Egypt') {
+  try {
+    const raw = localStorage.getItem('zakker_cached_timings');
+    if (raw) {
+      const timings = JSON.parse(raw);
+      cachedTimings = timings;
+      const displayCity = localStorage.getItem('zakker_city') || city;
+      const displayCountry = localStorage.getItem('zakker_country') || country;
+      updatePrayerUI(timings, `${displayCity}، ${displayCountry} (محفوظ أوفلاين)`);
+      startNextPrayerCountdown(timings);
+      scheduleAllOfflineNotifications(timings);
+      console.log('✅ تم تشغيل مواقيت الصلاة من الذاكرة المحلية (Offline Mode).');
+    }
+  } catch (e) {
+    console.warn('تعذر قراءة المواقيت من الكاش المحلي:', e);
   }
 }
 
@@ -593,6 +630,10 @@ function fetchPrayerTimesByGeo() {
           cachedTimings = data.data.timings;
           updatePrayerUI(cachedTimings, 'موقعك الحالي');
           startNextPrayerCountdown(cachedTimings);
+          try {
+            localStorage.setItem('zakker_cached_timings', JSON.stringify(cachedTimings));
+          } catch (e) {}
+          scheduleAllOfflineNotifications(cachedTimings);
           if (locationDisplay) locationDisplay.textContent = 'تم تحديد موقعك وجلب المواقيت بنجاح.';
         }
       } catch (err) {
@@ -606,6 +647,58 @@ function fetchPrayerTimesByGeo() {
   } else {
     fetchPrayerTimesByCity('Cairo', 'Egypt');
   }
+}
+
+// ----------------------------------------------------
+// جدولة إشعارات الأذكار والصلوات أوفلاين في التطبيق المثبت (Offline PWA)
+// ----------------------------------------------------
+function scheduleAllOfflineNotifications(timings) {
+  if (!timings || !window.NotificationScheduler) return;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+  function getTimestamp(timeStr, addMinutes = 0) {
+    if (!timeStr) return null;
+    const match = timeStr.match(/(\d{1,2}):(\d{2})/);
+    if (!match) return null;
+    const hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const date = new Date();
+    date.setHours(hours, minutes + addMinutes, 0, 0);
+
+    // إذا مضى الوقت اليوم بأكثر من 15 دقيقة، نجدوله للغد
+    if (date.getTime() < Date.now() - 15 * 60 * 1000) {
+      date.setDate(date.getDate() + 1);
+    }
+    return date.getTime();
+  }
+
+  const fajrTs = getTimestamp(timings.Fajr);
+  const morningTs = getTimestamp(timings.Fajr, 45); // أذكار الصباح بعد الفجر بـ 45 دقيقة
+  const dhuhrTs = getTimestamp(timings.Dhuhr);
+  const asrTs = getTimestamp(timings.Asr);
+  const eveningTs = getTimestamp(timings.Asr, 50); // أذكار المساء بعد العصر بـ 50 دقيقة
+  const maghribTs = getTimestamp(timings.Maghrib);
+  const ishaTs = getTimestamp(timings.Isha);
+  const sleepTs = getTimestamp('22:30'); // أذكار النوم 10:30 مساءً
+
+  const notificationsToSchedule = [
+    { id: 'fajr_prayer', title: 'صلاة الفجر 🕌', body: 'حان الآن موعد أذان الفجر، الصلاة خير من النوم.', triggerTimestamp: fajrTs, url: '/prayers', tag: 'prayer-fajr' },
+    { id: 'morning_azkar', title: 'أذكار الصباح ☀️', body: 'أصبحنا وأصبح الملك لله، حان وقت قراءة أذكار الصباح لنيل بركة يومك وحفظ الله.', triggerTimestamp: morningTs, url: '/morning', tag: 'azkar-morning' },
+    { id: 'dhuhr_prayer', title: 'صلاة الظهر 🕌', body: 'حان الآن موعد أذان وصلاة الظهر، أقم صلاتك يطمئن قلبك.', triggerTimestamp: dhuhrTs, url: '/prayers', tag: 'prayer-dhuhr' },
+    { id: 'asr_prayer', title: 'صلاة العصر 🕌', body: 'حان الآن موعد صلاة العصر، حافظوا على الصلوات والصلاة الوسطى.', triggerTimestamp: asrTs, url: '/prayers', tag: 'prayer-asr' },
+    { id: 'evening_azkar', title: 'أذكار المساء 🌇', body: 'أمسينا وأمسى الملك لله، حصّن نفسك وأهلك بقراءة أذكار المساء الآن.', triggerTimestamp: eveningTs, url: '/evening', tag: 'azkar-evening' },
+    { id: 'maghrib_prayer', title: 'صلاة المغرب 🕌', body: 'حان الآن موعد أذان وصلاة المغرب، تقبل الله طاعاتكم.', triggerTimestamp: maghribTs, url: '/prayers', tag: 'prayer-maghrib' },
+    { id: 'isha_prayer', title: 'صلاة العشاء 🕌', body: 'حان الآن موعد أذان وصلاة العشاء، ختم الله يومكم بخير.', triggerTimestamp: ishaTs, url: '/prayers', tag: 'prayer-isha' },
+    { id: 'sleep_azkar', title: 'أذكار النوم 🌙', body: 'باسمك ربي وضعت جنبي وبك أرفعه، اختم ليلتك بذكر الله وقراءة أذكار النوم.', triggerTimestamp: sleepTs, url: '/sleep', tag: 'azkar-sleep' }
+  ];
+
+  notificationsToSchedule.forEach(item => {
+    if (item.triggerTimestamp) {
+      window.NotificationScheduler.scheduleNotification(item);
+    }
+  });
+
+  console.log('🕌 [Offline Scheduler] تم تحديث جدولة إشعارات الصلوات والأذكار محلياً للعمل أوفلاين.');
 }
 
 // تحديث واجهة المستخدم بالصلوات بمرونة كاملة لكل الحالات
@@ -864,7 +957,55 @@ function initReadingProgress() {
 }
 
 // ----------------------------------------------------
-// 7. تهيئة الصفحة عند التحميل (DOMContentLoaded)
+// 7. دعم التثبيت كتطبيق (Install as App) والعمل بدون إنترنت (Offline PWA)
+// ----------------------------------------------------
+function initPwaAndOfflineSupport() {
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+  // إذا تم تشغيل التطبيق بعد تثبيته (Standalone PWA)
+  if (isStandalone) {
+    document.body.classList.add('is-pwa-standalone');
+    console.log('📱 [PWA] تم تشغيل التطبيق في وضع Standalone المثبت.');
+
+    // إذا كانت صلاحية الإشعارات لم تُطلب بعد، نفتح نافذة التفعيل تلقائياً لتصل التنبيهات
+    if ('Notification' in window && Notification.permission === 'default') {
+      setTimeout(() => {
+        openNotificationModal('soft');
+      }, 1500);
+    }
+  }
+
+  // محاولة تسجيل Periodic Background Sync لفحص الإشعارات دورياً في الخلفية أوفلاين
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready.then(async (reg) => {
+      if ('periodicSync' in reg) {
+        try {
+          await reg.periodicSync.register('check-azkar-offline', {
+            minInterval: 15 * 60 * 1000 // فحص كل 15 دقيقة
+          });
+          console.log('⚡ [PWA] تم تفعيل Periodic Sync بنجاح للإشعارات في الخلفية.');
+        } catch (err) {}
+      }
+    }).catch(() => {});
+  }
+
+  // استرجاع فوري لمواقيت الصلاة المخزنة في الكاش لتظهر بدون أي تأخير عند العمل أوفلاين
+  const savedTimings = localStorage.getItem('zakker_cached_timings');
+  if (savedTimings) {
+    try {
+      const parsed = JSON.parse(savedTimings);
+      cachedTimings = parsed;
+      const city = localStorage.getItem('zakker_city') || 'القاهرة';
+      const country = localStorage.getItem('zakker_country') || 'مصر';
+      updatePrayerUI(parsed, `${city}، ${country}`);
+      startNextPrayerCountdown(parsed);
+      scheduleAllOfflineNotifications(parsed);
+    } catch (e) {}
+  }
+}
+
+// ----------------------------------------------------
+// 8. تهيئة الصفحة عند التحميل (DOMContentLoaded)
 // ----------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
   initThemeToggle();
@@ -872,6 +1013,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initAzkarCounters();
   initFontSizeControls();
   initReadingProgress();
+  initPwaAndOfflineSupport();
 
   // مستمعات صفحة الصلوات
   const fetchBtn = document.getElementById('fetchPrayersBtn');

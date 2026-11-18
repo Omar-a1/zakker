@@ -3,23 +3,32 @@
  * 📱 Service Worker لمشروع ذكّر (PWA & Offline & Web Push)
  * ==============================================================================
  * المميزات:
- * 1. استراتيجيات تخزين ذكية (Cache First للملفات الثابتة، Network First للصفحات مع دعم كامل لـ Offline).
- * 2. استقبال إشعارات Web Push السحابية حتى عند إغلاق المتصفح (push, notificationclick, notificationclose).
- * 3. فحص وجدولة الإشعارات المحلية أوفلاين عبر IndexedDB.
+ * 1. استراتيجيات تخزين ذكية (Precache لجميع الأذكار والصفحات، Cache First للملفات الثابتة والخطوط).
+ * 2. دعم كامل للعمل بدون إنترنت (Offline Mode) لجميع الصفحات وخاصة خانة "جميع الأذكار" (/azkar).
+ * 3. استقبال إشعارات Web Push السحابية حتى عند إغلاق المتصفح (push, notificationclick).
+ * 4. فحص وجدولة وإطلاق الإشعارات المحلية أوفلاين في التطبيق المثبت عبر IndexedDB و TimestampTrigger و PeriodicSync.
  */
 
-const STATIC_CACHE_NAME = 'zakker-static-v4';
-const DYNAMIC_CACHE_NAME = 'zakker-dynamic-v4';
+const STATIC_CACHE_NAME = 'zakker-static-v5';
+const DYNAMIC_CACHE_NAME = 'zakker-dynamic-v5';
 
-// الملفات الثابتة والصفحات الأساسية التي يتم تخزينها فور تثبيت التطبيق للعمل بدون إنترنت
+// الملفات والصفحات الأساسية التي يتم تخزينها مسبقاً فور تثبيت التطبيق للعمل أوفلاين 100%
 const PRECACHE_ASSETS = [
   '/',
   '/morning',
   '/evening',
+  '/azkar',
+  '/daily',
+  '/sleep',
+  '/waking',
+  '/home-azkar',
+  '/restroom',
+  '/wudu',
   '/prayers',
+  '/api/azkar',
   '/css/style.css',
   '/css/thmanyah.css',
-  '/js/main.js?v=2.0',
+  '/js/main.js',
   '/js/notificationScheduler.js',
   '/manifest.json',
   '/zakker logo-modified.png',
@@ -32,25 +41,33 @@ const PRECACHE_ASSETS = [
 // ==============================================================================
 
 self.addEventListener('install', (event) => {
-  console.log('👷 [SW] جاري تثبيت الـ Service Worker وتخزين الملفات الأساسية للعمل Offline...');
+  console.log('👷 [SW] جاري تثبيت الـ Service Worker وتخزين جميع صفحات الأذكار للعمل Offline...');
   self.skipWaiting();
 
   event.waitUntil(
-    caches.open(STATIC_CACHE_NAME).then((cache) => {
-      return cache.addAll(PRECACHE_ASSETS).catch((err) => {
-        console.warn('⚠️ [SW Cache] تعذر تحميل بعض الملفات أثناء التثبيت المبدئي:', err);
+    caches.open(STATIC_CACHE_NAME).then(async (cache) => {
+      // تخزين الملفات بأمان: إن تعذر أحدها، يتم تخزين البقية دون إيقاف التثبيت
+      const promises = PRECACHE_ASSETS.map(async (asset) => {
+        try {
+          const res = await fetch(asset);
+          if (res.ok) {
+            await cache.put(asset, res);
+          }
+        } catch (err) {
+          console.warn(`⚠️ [SW Cache] تعذر التخزين المسبق للملف (${asset}):`, err.message);
+        }
       });
+      return Promise.all(promises);
     })
   );
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('🚀 [SW] تم تفعيل الـ Service Worker الجديد وتنظيف الكاش القديم.');
+  console.log('🚀 [SW] تم تفعيل Service Worker v5 وتنظيف الكاش القديم.');
   event.waitUntil(
     Promise.all([
-      // تفعيل التحكم الفوري بالصفحات المفتوحة
       clients.claim(),
-      // مسح أي كاش قديم لتحديث الملفات
+      // مسح الكاش القديم
       caches.keys().then((keys) => {
         return Promise.all(
           keys.map((key) => {
@@ -61,40 +78,46 @@ self.addEventListener('activate', (event) => {
           })
         );
       }),
-      // فحص أي إشعارات مجدولة في IndexedDB
+      // فحص أي تنبيهات مستحقة في IndexedDB
       checkScheduledNotificationsFromSW()
     ])
   );
 });
 
 // ==============================================================================
-// 2. استراتيجيات جلب البيانات (Fetch Strategy)
+// 2. استراتيجيات جلب البيانات (Fetch Strategy & Offline Support)
 // ==============================================================================
 
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
-  // استبعاد طلبات غير الـ GET وطلبات الـ API السحابية الخاصة بـ QStash و Push
-  if (request.method !== 'GET' || url.pathname.startsWith('/api/send-notification')) {
+  // استبعاد طلبات غير GET ومسارات API الحساسة للإشعارات السحابية
+  if (request.method !== 'GET' || url.pathname.startsWith('/api/send-notification') || url.pathname.startsWith('/api/save-subscription')) {
     return;
   }
 
-  // أ. استراتيجية Cache First للملفات الثابتة (CSS, JS, Fonts, Images)
+  // أ. استراتيجية Cache First للملفات الثابتة والخطوط والصور
   const isStaticAsset = (
-    url.pathname.startsWith('/css/') ||
-    url.pathname.startsWith('/js/') ||
-    url.pathname.startsWith('/img/') ||
-    url.pathname.endsWith('.png') ||
-    url.pathname.endsWith('.svg') ||
-    url.pathname.endsWith('.woff2') ||
-    url.pathname.endsWith('.woff') ||
-    url.pathname === '/manifest.json'
+    url.origin === location.origin && (
+      url.pathname.startsWith('/css/') ||
+      url.pathname.startsWith('/js/') ||
+      url.pathname.startsWith('/img/') ||
+      url.pathname.endsWith('.png') ||
+      url.pathname.endsWith('.svg') ||
+      url.pathname.endsWith('.woff2') ||
+      url.pathname.endsWith('.woff') ||
+      url.pathname === '/manifest.json'
+    )
+  ) || (
+    url.origin.includes('fonts.googleapis.com') ||
+    url.origin.includes('fonts.gstatic.com') ||
+    url.origin.includes('cdn.jsdelivr.net')
   );
 
   if (isStaticAsset) {
     event.respondWith(
-      caches.match(request).then((cachedResponse) => {
+      caches.match(request, { ignoreSearch: true }).then((cachedResponse) => {
         if (cachedResponse) {
           return cachedResponse;
         }
@@ -104,34 +127,44 @@ self.addEventListener('fetch', (event) => {
             caches.open(STATIC_CACHE_NAME).then((cache) => cache.put(request, responseClone));
           }
           return networkResponse;
+        }).catch(() => {
+          // محاولة أخيرة بالمطابقة بدون المعاملات
+          return caches.match(url.pathname, { ignoreSearch: true });
         });
       })
     );
     return;
   }
 
-  // ب. استراتيجية Network First للصفحات التفاعلية مع دعم العودة للكاش عند انقطاع الإنترنت (Offline Fallback)
+  // ب. استراتيجية Network First للصفحات مع Fallback كامل للكاش أوفلاين
   event.respondWith(
     fetch(request)
       .then((networkResponse) => {
-        // إذا نجح الاتصال، نحفظ نسخة في الكاش الديناميكي
         if (networkResponse && networkResponse.status === 200) {
           const responseClone = networkResponse.clone();
           caches.open(DYNAMIC_CACHE_NAME).then((cache) => cache.put(request, responseClone));
         }
         return networkResponse;
       })
-      .catch(() => {
-        // عند انقطاع الإنترنت، نسترجع النسخة المحفوظة من الكاش
-        return caches.match(request).then((cachedResponse) => {
-          if (cachedResponse) {
-            return cachedResponse;
-          }
-          // إذا كان الطلب لصفحة HTML ولم توجد في الكاش، نعيد الصفحة الرئيسية كـ Fallback
-          if (request.headers.get('accept') && request.headers.get('accept').includes('text/html')) {
-            return caches.match('/');
-          }
-        });
+      .catch(async () => {
+        // عند انقطاع الإنترنت، نسترجع الصفحة المخزنة من الكاش
+        const cached = await caches.match(request, { ignoreSearch: true });
+        if (cached) return cached;
+
+        // محاولة مطابقة المسار بدون query parameters
+        const pathCached = await caches.match(url.pathname, { ignoreSearch: true });
+        if (pathCached) return pathCached;
+
+        // إذا كان الطلب لصفحة HTML ولم توجد، نعيد الصفحة الرئيسية كـ Fallback
+        if (request.headers.get('accept') && request.headers.get('accept').includes('text/html')) {
+          const homeCached = await caches.match('/');
+          if (homeCached) return homeCached;
+        }
+
+        // لو كان طلباً للـ API الخاص بالأذكار
+        if (url.pathname === '/api/azkar') {
+          return caches.match('/api/azkar');
+        }
       })
   );
 });
@@ -203,9 +236,6 @@ self.addEventListener('notificationclose', (event) => {
 // 4. فحص وإطلاق الإشعارات المجدولة أوفلاين في IndexedDB
 // ==============================================================================
 
-/**
- * فتح قاعدة بيانات IndexedDB من داخل الـ Service Worker
- */
 function openIDB() {
   return new Promise((resolve) => {
     if (!('indexedDB' in self)) {
@@ -218,7 +248,7 @@ function openIDB() {
 }
 
 /**
- * فحص التنبيهات المستحقة في IndexedDB وإظهارها
+ * فحص التنبيهات المستحقة في IndexedDB وإظهارها حتى بدون إنترنت
  */
 async function checkScheduledNotificationsFromSW() {
   try {
@@ -234,22 +264,28 @@ async function checkScheduledNotificationsFromSW() {
       const now = Date.now();
 
       for (const item of items) {
-        if (item.status === 'pending' && item.triggerTimestamp <= now) {
-          await self.registration.showNotification(item.title, {
-            body: item.body,
-            icon: item.icon || '/zakker logo-modified.png',
-            tag: item.tag || 'zakker-scheduled',
-            data: { url: item.url || '/' },
-            dir: 'rtl',
-            lang: 'ar',
-            vibrate: [200, 100, 200]
-          });
+        if (item.status === 'pending') {
+          // إذا حان وقته (خلال آخر ساعتين لعدم إطلاق إشعارات قديمة جداً)
+          if (item.triggerTimestamp <= now && (now - item.triggerTimestamp) < (2 * 60 * 60 * 1000)) {
+            await self.registration.showNotification(item.title, {
+              body: item.body,
+              icon: item.icon || '/zakker logo-modified.png',
+              tag: item.tag || 'zakker-offline-alert',
+              data: { url: item.url || '/' },
+              dir: 'rtl',
+              lang: 'ar',
+              vibrate: [200, 100, 200]
+            });
 
-          // تحديث الحالة لمكتمل
-          item.status = 'completed';
-          item.triggeredAt = now;
-          store.put(item);
-          console.log(`⏰ [SW Offline Scheduler] تم إظهار التنبيه المجدول: ${item.title}`);
+            item.status = 'completed';
+            item.triggeredAt = now;
+            store.put(item);
+            console.log(`⏰ [SW Offline Scheduler] تم إظهار التنبيه الأوفلاين: ${item.title}`);
+          } else if (item.triggerTimestamp < now - (2 * 60 * 60 * 1000)) {
+            // تنبيه قديم فات وقته بأكثر من ساعتين يتم وسمه كمنتهٍ
+            item.status = 'expired';
+            store.put(item);
+          }
         }
       }
     };
@@ -264,3 +300,22 @@ self.addEventListener('message', (event) => {
     event.waitUntil(checkScheduledNotificationsFromSW());
   }
 });
+
+// Periodic Background Sync للأجهزة المدعومة (Chrome Android / PWA)
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag === 'check-azkar-offline' || event.tag === 'sync-notifications') {
+    event.waitUntil(checkScheduledNotificationsFromSW());
+  }
+});
+
+// Background Sync عند عودة الاتصال أو تنشيط الـ Service Worker
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'check-azkar-offline' || event.tag === 'sync-notifications') {
+    event.waitUntil(checkScheduledNotificationsFromSW());
+  }
+});
+
+// فحص دوري خفيف كل دقيقة طالما الـ Service Worker نشط في الذاكرة
+setInterval(() => {
+  checkScheduledNotificationsFromSW();
+}, 60 * 1000);

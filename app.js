@@ -475,8 +475,8 @@ if (!process.env.VERCEL) {
     }
   }, CRON_CAIRO_TZ);
 
-  // 3. أذكار المساء يومياً 17:00 (5:00 مساءً بتوقيت القاهرة) كاحتياطي إضافي
-  cron.schedule('0 17 * * *', async () => {
+  // 3. أذكار المساء يومياً 16:00 (4:00 مساءً بتوقيت القاهرة) قبل المغرب في الشتاء والصيف
+  cron.schedule('0 16 * * *', async () => {
     console.log('⏰ [Cron] إرسال أذكار المساء (القاهرة)...');
     try {
       await sendScheduledAzkarNotifications();

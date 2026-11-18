@@ -332,6 +332,11 @@ const NotificationScheduler = (function() {
   };
 })();
 
+// إتاحة الوحدة على الكائن العام window في المتصفح
+if (typeof window !== 'undefined') {
+  window.NotificationScheduler = NotificationScheduler;
+}
+
 // تصدير للاستخدام في المتصفح أو بيئات الاختبار
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = NotificationScheduler;

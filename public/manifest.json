@@ -24,5 +24,35 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "أذكار الصباح",
+      "short_name": "الصباح",
+      "description": "قراءة أذكار الصباح النبوية",
+      "url": "/morning",
+      "icons": [{ "src": "/zakker logo-modified.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "أذكار المساء",
+      "short_name": "المساء",
+      "description": "قراءة أذكار المساء النبوية",
+      "url": "/evening",
+      "icons": [{ "src": "/zakker logo-modified.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "جميع الأذكار",
+      "short_name": "جميع الأذكار",
+      "description": "تصفح جميع الأذكار في سائر الأحوال بدون إنترنت",
+      "url": "/azkar",
+      "icons": [{ "src": "/zakker logo-modified.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "مواقيت الصلاة",
+      "short_name": "الصلوات",
+      "description": "مواقيت الصلاة والعد التنازلي",
+      "url": "/prayers",
+      "icons": [{ "src": "/zakker logo-modified.png", "sizes": "192x192" }]
+    }
   ]
 }
