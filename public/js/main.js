@@ -26,6 +26,59 @@ function initThemeToggle() {
 }
 
 // ----------------------------------------------------
+// 1.1 قائمة البرجر للشاشات الصغيرة (Mobile Drawer Navigation)
+// ----------------------------------------------------
+function initMobileMenu() {
+  const burgerBtn = document.getElementById('burgerBtn');
+  const closeDrawerBtn = document.getElementById('closeDrawerBtn');
+  const drawer = document.getElementById('mobileMenuDrawer');
+  const backdrop = document.getElementById('mobileMenuBackdrop');
+
+  if (!burgerBtn || !drawer || !backdrop) return;
+
+  function openMenu() {
+    drawer.classList.add('is-open');
+    backdrop.classList.add('is-open');
+    burgerBtn.classList.add('is-active');
+    burgerBtn.setAttribute('aria-expanded', 'true');
+    drawer.setAttribute('aria-hidden', 'false');
+    backdrop.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeMenu() {
+    drawer.classList.remove('is-open');
+    backdrop.classList.remove('is-open');
+    burgerBtn.classList.remove('is-active');
+    burgerBtn.setAttribute('aria-expanded', 'false');
+    drawer.setAttribute('aria-hidden', 'true');
+    backdrop.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+
+  burgerBtn.addEventListener('click', () => {
+    if (drawer.classList.contains('is-open')) {
+      closeMenu();
+    } else {
+      openMenu();
+    }
+  });
+
+  if (closeDrawerBtn) {
+    closeDrawerBtn.addEventListener('click', closeMenu);
+  }
+
+  backdrop.addEventListener('click', closeMenu);
+
+  // إغلاق القائمة عند الضغط على Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && drawer.classList.contains('is-open')) {
+      closeMenu();
+    }
+  });
+}
+
+// ----------------------------------------------------
 // 2. نظام الإشعارات المتطور (Service Worker + Web Push)
 // ----------------------------------------------------
 const notifyBtn = document.getElementById('notifyBtn');
@@ -1009,6 +1062,7 @@ function initPwaAndOfflineSupport() {
 // ----------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
   initThemeToggle();
+  initMobileMenu();
   initNotifications();
   initAzkarCounters();
   initFontSizeControls();
