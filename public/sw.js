@@ -9,8 +9,8 @@
  * 4. فحص وجدولة وإطلاق الإشعارات المحلية أوفلاين في التطبيق المثبت عبر IndexedDB و TimestampTrigger و PeriodicSync.
  */
 
-const STATIC_CACHE_NAME = 'zakker-static-v5';
-const DYNAMIC_CACHE_NAME = 'zakker-dynamic-v5';
+const STATIC_CACHE_NAME = 'zakker-static-v6';
+const DYNAMIC_CACHE_NAME = 'zakker-dynamic-v6';
 
 // الملفات والصفحات الأساسية التي يتم تخزينها مسبقاً فور تثبيت التطبيق للعمل أوفلاين 100%
 const PRECACHE_ASSETS = [
@@ -63,7 +63,7 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('🚀 [SW] تم تفعيل Service Worker v5 وتنظيف الكاش القديم.');
+  console.log('🚀 [SW] تم تفعيل Service Worker v6 وتنظيف الكاش القديم.');
   event.waitUntil(
     Promise.all([
       clients.claim(),
